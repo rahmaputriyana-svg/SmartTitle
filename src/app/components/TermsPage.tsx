@@ -3,7 +3,12 @@ import { S } from "./AuthPages";
 
 interface Props { onNavigate: (p: string) => void }
 
-const SECTIONS = [
+export interface LegalSection {
+  title: string;
+  content: string[];
+}
+
+export const TERMS_SECTIONS: LegalSection[] = [
   {
     title: "1. Penggunaan Aplikasi",
     content: [
@@ -110,7 +115,7 @@ export function TermsPage({ onNavigate }: Props) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-            {SECTIONS.map((s, i) => (
+            {TERMS_SECTIONS.map((s, i) => (
               <div key={i}>
                 <h2 style={{ fontSize: "0.95rem", fontWeight: 700, color: S.dark, marginBottom: "0.75rem" }}>{s.title}</h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>

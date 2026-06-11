@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Sparkles, Eye, EyeOff, ArrowLeft, Mail, Lock, User, CheckCircle2, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Sparkles, Eye, EyeOff, ArrowLeft, Mail, Lock, User, CheckCircle2, ShieldCheck, X } from "lucide-react";
 import { useUser } from "../UserContext";
 import { toast } from "sonner";
+import { TERMS_SECTIONS } from "./TermsPage";
+import { PRIVACY_SECTIONS } from "./PrivacyPage";
 
 interface Props { onNavigate: (p: string) => void }
 
@@ -173,6 +175,83 @@ export function LoginPage({ onNavigate }: Props) {
   );
 }
 
+function LegalModal({ type, onClose }: { type: "terms" | "privacy"; onClose: () => void }) {
+  const sections = type === "terms" ? TERMS_SECTIONS : PRIVACY_SECTIONS;
+  const title = type === "terms" ? "Syarat & Ketentuan" : "Kebijakan Privasi";
+
+  const handleEsc = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [handleEsc]);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }} />
+
+      {/* Modal card */}
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 580, maxHeight: "85vh",
+        background: "#FAFAF8", borderRadius: 16, display: "flex", flexDirection: "column",
+        boxShadow: "0 24px 80px rgba(0,0,0,0.18)", border: `1px solid ${S.border}`,
+        fontFamily: "'Inter',sans-serif",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.125rem 1.5rem", borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <img src="/logo.png" alt="SmartTitle AI" style={{ width: 22, height: 22, borderRadius: 6, objectFit: "contain" }} />
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, color: S.dark }}>{title}</h2>
+          </div>
+          <button onClick={onClose} aria-label="Tutup" style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 30, height: 30, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: S.muted,
+            transition: "all 0.15s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = S.border; e.currentTarget.style.color = S.dark; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.muted; }}>
+            <X style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
+          <p style={{ fontSize: "0.72rem", color: "#A8A29E", marginBottom: "1.25rem" }}>Terakhir diperbarui: Juni 2026</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {sections.map((s, i) => (
+              <div key={i}>
+                <h3 style={{ fontSize: "0.875rem", fontWeight: 700, color: S.dark, marginBottom: "0.5rem" }}>{s.title}</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                  {s.content.map((p, j) => (
+                    <p key={j} style={{ fontSize: "0.78rem", color: S.muted, lineHeight: 1.75, paddingLeft: "0.75rem", borderLeft: `2px solid ${S.border}` }}>{p}</p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "1rem 1.5rem", borderTop: `1px solid ${S.border}`, flexShrink: 0 }}>
+          <button onClick={onClose}
+            style={{ width: "100%", padding: "0.65rem", borderRadius: 10, background: S.dark, color: "#fff", fontSize: "0.85rem", fontWeight: 600, border: "none", cursor: "pointer" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#2C2927")}
+            onMouseLeave={e => (e.currentTarget.style.background = S.dark)}>
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RegisterPage({ onNavigate }: Props) {
   const { signUp } = useUser();
   const [name, setName] = useState("");
@@ -183,6 +262,7 @@ export function RegisterPage({ onNavigate }: Props) {
   const [showC, setShowC] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [legalModal, setLegalModal] = useState<"terms" | "privacy" | null>(null);
 
   const strength = pass.length === 0 ? 0 : pass.length < 6 ? 1 : pass.length < 10 ? 2 : pass.length < 14 ? 3 : 4;
   const strengthColor = ["","#DC2626","#D97706","#EAB308","#16A34A"][strength];
@@ -237,7 +317,7 @@ export function RegisterPage({ onNavigate }: Props) {
         <label style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", cursor: "pointer" }}>
           <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ accentColor: S.gold, marginTop: 2 }} />
           <span style={{ fontSize: "0.78rem", color: S.muted, lineHeight: 1.6 }}>
-            Saya setuju dengan <a href="#" onClick={e => { e.preventDefault(); onNavigate("terms"); }} style={{ color: S.gold, cursor: "pointer" }}>Syarat & Ketentuan</a> dan <a href="#" onClick={e => { e.preventDefault(); onNavigate("privacy"); }} style={{ color: S.gold, cursor: "pointer" }}>Kebijakan Privasi</a>
+            Saya setuju dengan <a href="#" onClick={e => { e.preventDefault(); setLegalModal("terms"); }} style={{ color: S.gold, cursor: "pointer" }}>Syarat & Ketentuan</a> dan <a href="#" onClick={e => { e.preventDefault(); setLegalModal("privacy"); }} style={{ color: S.gold, cursor: "pointer" }}>Kebijakan Privasi</a>
           </span>
         </label>
 
@@ -250,6 +330,7 @@ export function RegisterPage({ onNavigate }: Props) {
           <button onClick={() => onNavigate("login")} style={{ background: "none", border: "none", cursor: "pointer", color: S.gold, fontWeight: 600, fontSize: "0.82rem", padding: 0 }}>Masuk</button>
         </p>
       </div>
+      {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />}
     </Layout>
   );
 }
