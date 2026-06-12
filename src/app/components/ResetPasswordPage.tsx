@@ -35,53 +35,39 @@ export function ResetPasswordPage({ onNavigate }: Props) {
       return;
     }
 
-    console.log("[ResetPassword] START UPDATE PASSWORD");
     setLoading(true);
 
     try {
-      console.log("[ResetPassword] CALLING: supabase.auth.updateUser");
-      const { error } = await supabase.auth.updateUser({
+      console.log("[ResetPassword] Mulai update password");
+
+      const updatePromise = supabase.auth.updateUser({
         password: newPass,
       });
 
-      console.log("[ResetPassword] UPDATE RESULT:", error);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Update password timeout")), 10000)
+      );
 
-      if (error) {
-        console.error("[ResetPassword] UPDATE ERROR:", error.message);
-        toast.error(error.message);
+      const result: any = await Promise.race([updatePromise, timeoutPromise]);
+
+      if (result?.error) {
+        toast.error(result.error.message);
         return;
       }
 
-      console.log("[ResetPassword] PASSWORD UPDATE SUCCESS");
       toast.success("Password berhasil diperbarui. Silakan login.");
 
-      console.log("[ResetPassword] CALLING: clearPasswordRecovery");
+      setLoading(false);
       clearPasswordRecovery();
 
-      console.log("[ResetPassword] SETTING LOADING FALSE");
-      setLoading(false);
-
-      console.log("[ResetPassword] WAITING 500ms BEFORE SIGNOUT");
-      setTimeout(async () => {
-        try {
-          console.log("[ResetPassword] BEFORE SIGNOUT");
-          await supabase.auth.signOut();
-          console.log("[ResetPassword] AFTER SIGNOUT");
-        } catch (e) {
-          console.error("[ResetPassword] Sign out error:", e);
-        }
-
-        console.log("[ResetPassword] BEFORE NAVIGATE LOGIN");
+      setTimeout(() => {
+        supabase.auth.signOut();
         onNavigate("login");
-        console.log("[ResetPassword] AFTER NAVIGATE LOGIN");
       }, 500);
 
-      return;
     } catch (err) {
-      console.error("[ResetPassword] CATCH ERROR:", err);
+      console.error("[ResetPassword] Error:", err);
       toast.error("Gagal memperbarui password. Silakan coba lagi.");
-    } finally {
-      console.log("[ResetPassword] FINALLY: Setting loading false");
       setLoading(false);
     }
   };
