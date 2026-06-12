@@ -208,11 +208,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         // Detect password recovery from email link
         if (event === "PASSWORD_RECOVERY") {
-          console.log("[Auth] PASSWORD_RECOVERY detected — setting recovery flag");
-          console.log("[Auth] NOT cleaning URL yet - keeping recovery token for updateUser");
+          console.log("[Auth] PASSWORD_RECOVERY detected — recovery mode only");
+          console.log("[Auth] NOT loading profile/history/favorites to prevent auth lock");
+
           setPasswordRecovery(true);
-          // DON'T clean URL here - token is needed for updateUser()
-          // cleanAuthUrl(); // ← REMOVED - will clean after successful password update
+          setUser(currentUser);
+          setAuthLoading(false);
+
+          // CRITICAL: Stop here to prevent auth lock
+          // DON'T cleanAuthUrl - token needed for updateUser()
+          // DON'T loadProfile - causes database lock
+          // DON'T loadHistory - causes database lock
+          // DON'T loadFavorites - causes database lock
+          // DON'T redirect to dashboard
+          // Let ResetPasswordPage handle updateUser()
+          return;
         }
 
         setUser(currentUser);
