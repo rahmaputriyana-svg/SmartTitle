@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { UserProvider, useUser } from "./UserContext";
 import { Toaster } from "./components/ui/sonner";
+import { toast } from "sonner";
 import { LandingPage } from "./components/LandingPage";
-import { LoginPage, RegisterPage, ForgotPasswordPage } from "./components/AuthPages";
+import { LoginPage } from "./components/LoginPage";
+import { RegisterPage, ForgotPasswordPage, VerifyEmailPage } from "./components/AuthPages";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { DashboardHome } from "./components/DashboardHome";
@@ -11,11 +13,12 @@ import { HistoryPage } from "./components/HistoryPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { TermsPage } from "./components/TermsPage";
 import { PrivacyPage } from "./components/PrivacyPage";
+import { getAuthParamsFromUrl } from "../lib/supabase";
 
-export type Page = "landing" | "login" | "register" | "forgot-password" | "reset-password" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
+export type Page = "landing" | "login" | "register" | "verify-email" | "forgot-password" | "reset-password" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
 
 const DASH: Page[] = ["dashboard", "generator", "history", "profile"];
-const AUTH: Page[] = ["login", "register", "forgot-password"];
+const AUTH: Page[] = ["login", "register", "verify-email", "forgot-password"];
 const PUBLIC: Page[] = ["terms", "privacy"];
 
 function LoadingScreen() {
@@ -32,19 +35,26 @@ function LoadingScreen() {
 
 function isRecoveryUrl(): boolean {
   if (window.location.pathname === "/reset-password") return true;
-  if (window.location.hash.includes("type=recovery")) return true;
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  if (hashParams.get("type") === "recovery") return true;
   const params = new URLSearchParams(window.location.search);
   if (params.get("type") === "recovery") return true;
   return false;
 }
 
+function hasAuthError(): boolean {
+  const p = getAuthParamsFromUrl();
+  return !!p.error;
+}
+
 function AppInner() {
   const [page, setPage] = useState<Page>(() => {
-    // Detect password recovery URL on initial load (pathname, hash, or query params)
+    // Detect auth callback URLs on initial load
+    if (hasAuthError()) return "login"; // Show login page with error message
     if (isRecoveryUrl()) return "reset-password";
     return "landing";
   });
-  const { user, authLoading, passwordRecovery, clearPasswordRecovery } = useUser();
+  const { user, authLoading, passwordRecovery, clearPasswordRecovery, authError, clearAuthError } = useUser();
 
   const go = (p: string) => {
     setPage(p as Page);
@@ -65,27 +75,41 @@ function AppInner() {
 
     // Never redirect away from reset-password while user has a valid session
     // (they need the session to call updateUser for password reset).
-    // If no session, send them to login (invalid/expired recovery link).
+    // IMPORTANT: Don't redirect when on reset-password page during initial recovery URL load,
+    // because the session hasn't been created yet from the recovery token.
     if (page === "reset-password") {
-      if (!user && !passwordRecovery) setPage("login");
-      return;
+      return; // Stay on reset-password page - let Supabase process the recovery token
     }
 
     // Don't redirect during active password recovery flow
     if (passwordRecovery) return;
 
-    if (user && (AUTH.includes(page) || page === "landing" || PUBLIC.includes(page))) {
-      setPage("dashboard");
-    } else if (!user && DASH.includes(page)) {
+    // Simple guard: if no user and trying to access dashboard, redirect to login
+    if (!user && DASH.includes(page)) {
       setPage("login");
     }
   }, [user, authLoading, page, passwordRecovery]);
+
+  // Show toast for auth errors from URL
+  useEffect(() => {
+    if (authError) {
+      console.log("[Auth] Showing auth error:", authError.code, authError.message);
+      const isExpired = authError.code === "otp_expired" || authError.code === "access_denied";
+      if (isExpired) {
+        toast.error("Link verifikasi sudah kedaluwarsa atau tidak valid. Silakan minta link baru.");
+      } else {
+        toast.error(authError.message || "Terjadi kesalahan autentikasi.");
+      }
+      clearAuthError();
+    }
+  }, [authError, clearAuthError]);
 
   if (authLoading) return <LoadingScreen />;
 
   if (page === "landing") return <LandingPage onNavigate={go} />;
   if (page === "login") return <LoginPage onNavigate={go} />;
   if (page === "register") return <RegisterPage onNavigate={go} />;
+  if (page === "verify-email") return <VerifyEmailPage onNavigate={go} />;
   if (page === "forgot-password") return <ForgotPasswordPage onNavigate={go} />;
   if (page === "reset-password") return <ResetPasswordPage onNavigate={go} />;
   if (page === "terms") return <TermsPage onNavigate={go} />;

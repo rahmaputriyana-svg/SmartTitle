@@ -3,67 +3,92 @@ import { Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { useUser } from "../UserContext";
 import { Layout, Field, S } from "./AuthPages";
 import { toast } from "sonner";
+import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 
 interface Props { onNavigate: (p: string) => void }
 
 export function ResetPasswordPage({ onNavigate }: Props) {
-  const { updatePassword, signOut } = useUser();
+  const { clearPasswordRecovery } = useUser();
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showConf, setShowConf] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const passwordsMatch = newPass === confirmPass;
   const minLengthMet = newPass.length >= 8;
   const valid = minLengthMet && passwordsMatch && newPass.length > 0;
 
-  const submit = async () => {
-    if (!newPass) { toast.error("Kata sandi tidak boleh kosong."); return; }
-    if (!minLengthMet) { toast.error("Kata sandi minimal 8 karakter."); return; }
-    if (!passwordsMatch) { toast.error("Konfirmasi kata sandi tidak cocok."); return; }
-    if (!valid) return;
+  const handleSubmit = async () => {
+    if (!newPass || !confirmPass) {
+      toast.error("Isi kata sandi baru dan konfirmasi kata sandi.");
+      return;
+    }
 
+    if (newPass.length < 8) {
+      toast.error("Kata sandi minimal 8 karakter.");
+      return;
+    }
+
+    if (newPass !== confirmPass) {
+      toast.error("Konfirmasi kata sandi tidak cocok.");
+      return;
+    }
+
+    console.log("[ResetPassword] START UPDATE PASSWORD");
     setLoading(true);
-    const { error } = await updatePassword(newPass);
-    if (error) {
+
+    try {
+      console.log("[ResetPassword] CALLING: supabase.auth.updateUser");
+      const { error } = await supabase.auth.updateUser({
+        password: newPass,
+      });
+
+      console.log("[ResetPassword] UPDATE RESULT:", error);
+
+      if (error) {
+        console.error("[ResetPassword] UPDATE ERROR:", error.message);
+        toast.error(error.message);
+        return;
+      }
+
+      console.log("[ResetPassword] PASSWORD UPDATE SUCCESS");
+      toast.success("Password berhasil diperbarui. Silakan login.");
+
+      console.log("[ResetPassword] CALLING: clearPasswordRecovery");
+      clearPasswordRecovery();
+
+      console.log("[ResetPassword] SETTING LOADING FALSE");
       setLoading(false);
-      toast.error(error);
-    } else {
-      // Sign out after successful password update so user must log in with new password
-      await signOut();
+
+      console.log("[ResetPassword] WAITING 500ms BEFORE SIGNOUT");
+      setTimeout(async () => {
+        try {
+          console.log("[ResetPassword] BEFORE SIGNOUT");
+          await supabase.auth.signOut();
+          console.log("[ResetPassword] AFTER SIGNOUT");
+        } catch (e) {
+          console.error("[ResetPassword] Sign out error:", e);
+        }
+
+        console.log("[ResetPassword] BEFORE NAVIGATE LOGIN");
+        onNavigate("login");
+        console.log("[ResetPassword] AFTER NAVIGATE LOGIN");
+      }, 500);
+
+      return;
+    } catch (err) {
+      console.error("[ResetPassword] CATCH ERROR:", err);
+      toast.error("Gagal memperbarui password. Silakan coba lagi.");
+    } finally {
+      console.log("[ResetPassword] FINALLY: Setting loading false");
       setLoading(false);
-      setSuccess(true);
-      toast.success("Kata sandi berhasil diperbarui!");
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && valid) submit();
+    if (e.key === "Enter" && valid) handleSubmit();
   };
-
-  // Success state
-  if (success) {
-    return (
-      <Layout title="Kata Sandi Diperbarui" subtitle="Kata sandi Anda telah berhasil diubah" onNavigate={onNavigate}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.25rem" }}>
-            <ShieldCheck style={{ width: 26, height: 26, color: "#16A34A" }} />
-          </div>
-          <p style={{ fontSize: "0.875rem", color: S.muted, lineHeight: 1.7, marginBottom: "1.5rem" }}>
-            Anda dapat login dengan kata sandi baru Anda.
-          </p>
-          <button onClick={() => onNavigate("login")}
-            style={{ width: "100%", padding: "0.75rem", borderRadius: 10, background: S.dark, color: "#fff", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: "pointer" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#2C2927")}
-            onMouseLeave={e => (e.currentTarget.style.background = S.dark)}>
-            Masuk dengan Kata Sandi Baru
-          </button>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout title="Buat Kata Sandi Baru" subtitle="Masukkan kata sandi baru untuk akun Anda" onNavigate={onNavigate}>
@@ -97,7 +122,7 @@ export function ResetPasswordPage({ onNavigate }: Props) {
         )}
 
         {/* Submit */}
-        <button onClick={submit} disabled={!valid || loading}
+        <button onClick={handleSubmit} disabled={!valid || loading}
           style={{ width: "100%", padding: "0.75rem", borderRadius: 10, background: valid ? S.dark : "#C4B9AA", color: "#fff", fontSize: "0.9rem", fontWeight: 600, border: "none", cursor: valid && !loading ? "pointer" : "not-allowed", transition: "all 0.15s" }}>
           {loading ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
             <span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.25)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />

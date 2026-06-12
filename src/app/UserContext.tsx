@@ -3,7 +3,7 @@ import {
   useCallback, useMemo, useEffect,
 } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { supabase, isSupabaseConfigured, getAuthParamsFromUrl, cleanAuthUrl } from "../lib/supabase";
 import { toast } from "sonner";
 
 export interface TitleResult {
@@ -47,10 +47,12 @@ interface UserContextType {
   authLoading: boolean;
   emailVerified: boolean;
   passwordRecovery: boolean;
+  authError: { code: string; message: string } | null;
   clearPasswordRecovery: () => void;
+  clearAuthError: () => void;
   resendVerification: () => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; redirect?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ error: string | null }>;
@@ -109,6 +111,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [authError, setAuthError] = useState<{ code: string; message: string } | null>(null);
 
   const loadProfile = useCallback(async (userId: string, email: string) => {
     if (!isSupabaseConfigured) return;
@@ -167,24 +170,47 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Detect auth errors from URL on initial load ────────────────
+  useEffect(() => {
+    const params = getAuthParamsFromUrl();
+
+    if (params.error) {
+      console.log("[Auth] URL contains auth error:", params.error, params.errorDescription, params.errorCode);
+      setAuthError({
+        code: params.errorCode || params.error || "unknown_error",
+        message: params.errorDescription || "Terjadi kesalahan pada link autentikasi.",
+      });
+      cleanAuthUrl();
+    }
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setAuthLoading(false);
       return;
     }
 
+    console.log("[Auth] Initializing auth listener...");
+    console.log("[Auth] Current URL:", window.location.href);
+    console.log("[Auth] URL hash:", window.location.hash);
+    console.log("[Auth] URL search:", window.location.search);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         const currentUser = session?.user ?? null;
+        console.log("[Auth] onAuthStateChange:", event, "| user:", currentUser?.email ?? "null", "| email_confirmed:", currentUser?.email_confirmed_at ?? "null");
 
         // Detect session expiry / token refresh failure
         if (event === "TOKEN_REFRESHED" && !session) {
+          console.log("[Auth] Token refresh failed — session expired");
           toast.error("Sesi telah berakhir. Silakan login kembali.");
         }
 
         // Detect password recovery from email link
         if (event === "PASSWORD_RECOVERY") {
+          console.log("[Auth] PASSWORD_RECOVERY detected — setting recovery flag");
           setPasswordRecovery(true);
+          cleanAuthUrl();
         }
 
         setUser(currentUser);
@@ -207,43 +233,79 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured) {
+      // Demo mode
       setUser({ id: "demo", email } as User);
       setProfile(prev => ({ ...prev, email, name: email.split("@")[0] }));
       setAuthLoading(false);
       return { error: null };
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    if (error) {
+      return { error: error.message };
+    }
+    return { error: null };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
     if (!isSupabaseConfigured) {
-      setUser({ id: "demo", email } as User);
-      setProfile(prev => ({ ...prev, email, name }));
-      setAuthLoading(false);
+      // Demo mode: don't set user — register should NOT equal login
       return { error: null };
     }
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    });
-    return { error: error?.message ?? null };
-  }, []);
+    console.log("[Auth] signUp called for:", email);
 
-  const signOut = useCallback(async () => {
-    if (isSupabaseConfigured) await supabase.auth.signOut();
     setUser(null);
     setProfile(INITIAL_PROFILE);
     setHistory([]);
     setFavorites([]);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+        emailRedirectTo: `${window.location.origin}/reset-password`,
+      },
+    });
+    if (error) {
+      console.log("[Auth] signUp error:", error.message);
+      return { error: error.message };
+    }
+    // Kill any auto-created session. If Supabase "Confirm email" is OFF,
+    // signUp creates a session immediately — we must destroy it so that
+    // registration does NOT count as login.
+    console.log("[Auth] signUp success — signing out to prevent auto-login");
+    await supabase.auth.signOut();
+    return { error: null, redirect: "login" };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    console.log("[Auth] signOut: Starting");
+    if (isSupabaseConfigured) {
+      console.log("[Auth] signOut: Calling supabase.auth.signOut");
+      await supabase.auth.signOut();
+      console.log("[Auth] signOut: Supabase signOut completed");
+    }
+    setUser(null);
+    setProfile(INITIAL_PROFILE);
+    setHistory([]);
+    setFavorites([]);
+    console.log("[Auth] signOut: State cleared");
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
     if (!isSupabaseConfigured) return { error: null };
+    const resetUrl = `${window.location.origin}/reset-password`;
+    console.log("[RESET EMAIL] Reset URL:", resetUrl);
+    console.log("[Auth] resetPassword called for:", email, "| redirectTo:", resetUrl);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: resetUrl,
     });
+    if (error) {
+      console.log("[Auth] resetPassword error:", error.message);
+    } else {
+      console.log("[Auth] resetPassword success — recovery email sent");
+      console.log("[Auth] Email link will redirect to:", resetUrl);
+    }
     return { error: error?.message ?? null };
   }, []);
 
@@ -597,6 +659,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setPasswordRecovery(false);
   }, []);
 
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
+
   const emailVerified = !!user?.email_confirmed_at;
 
   const resendVerification = useCallback(async () => {
@@ -619,7 +685,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   return (
     <UserContext.Provider value={{
-      user, authLoading, emailVerified, passwordRecovery, clearPasswordRecovery, resendVerification,
+      user, authLoading, emailVerified, passwordRecovery, clearPasswordRecovery,
+      authError, clearAuthError,
+      resendVerification,
       signIn, signUp, signOut, resetPassword, changePassword, updatePassword,
       profile, updateProfile, uploadAvatar, removeAvatar,
       history, historyLoading, addHistoryItem, deleteHistoryItem, toggleSave,
