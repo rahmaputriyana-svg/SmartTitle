@@ -225,22 +225,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Detect email verification (signup confirmation)
-        // When user clicks email verification link, Supabase creates a session automatically.
-        // We must sign out immediately to prevent auto-login and redirect to auth-callback.
-        if (event === "SIGNED_IN" && currentUser?.email_confirmed_at) {
-          const isNewlyVerified = !currentUser.last_sign_in_at || 
-            new Date(currentUser.last_sign_in_at).getTime() - new Date(currentUser.email_confirmed_at).getTime() < 5000;
-          
-          if (isNewlyVerified) {
-            console.log("[Auth] Email just verified — signing out to prevent auto-login");
-            // Sign out immediately to prevent dashboard access
-            await supabase.auth.signOut();
-            setUser(null);
-            setAuthLoading(false);
-            return;
-          }
-        }
+        // Email verification is handled by AuthCallbackPage
+        // Don't sign out here - let AuthCallbackPage process the session first
 
         setUser(currentUser);
         setAuthLoading(false);

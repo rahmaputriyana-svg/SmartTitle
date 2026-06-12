@@ -60,8 +60,11 @@ export function AuthCallbackPage({ onNavigate }: Props) {
         // Get the current session (Supabase PKCE exchanges the code automatically)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
+        console.log("[AuthCallback] Session:", session);
+        console.log("[AuthCallback] Email confirmed:", session?.user?.email_confirmed_at);
+
         if (sessionError) {
-          console.error("[AuthCallback] Session error:", sessionError);
+          console.error("[AuthCallback] Verification failed:", sessionError);
           setStatus("error");
           setMessage("Gagal memverifikasi email. Silakan coba lagi.");
           return;
@@ -85,19 +88,20 @@ export function AuthCallbackPage({ onNavigate }: Props) {
           return;
         }
 
+        console.log("[AuthCallback] Verification success");
         console.log("[AuthCallback] Email verified successfully! Signing out...");
         
-        // Email verified successfully — sign out immediately.
-        // We don't want the user to be logged in after email verification.
+        // Email verified successfully
+        setStatus("success");
+        setMessage("Akun Anda berhasil diverifikasi. Silakan login.");
+
+        // Clean URL
+        cleanAuthUrl();
+
+        // Sign out after setting success state
         await supabase.auth.signOut();
         
         console.log("[AuthCallback] Signed out. Cleaning URL...");
-        
-        // Now clean URL after Supabase has processed everything
-        cleanAuthUrl();
-
-        setStatus("success");
-        setMessage("Akun Anda berhasil diverifikasi. Silakan login.");
 
         // Navigate to login after short delay
         setTimeout(() => {

@@ -95,6 +95,20 @@ function AppInner() {
     // Don't redirect during active password recovery flow
     if (passwordRecovery) return;
 
+    // CRITICAL: After email verification, user is signed out immediately by AuthCallbackPage.
+    // Even if there's a brief moment with a session, don't auto-navigate to dashboard.
+    // User MUST manually login via LoginPage to access dashboard.
+    if (page === "dashboard" && user) {
+      // Check if this is from email verification (just verified, not manual login)
+      // If user just arrived at dashboard without going through LoginPage, redirect to login
+      const cameFromAuthCallback = document.referrer.includes("auth-callback");
+      if (cameFromAuthCallback) {
+        console.log("[App] Preventing auto-dashboard after email verification");
+        setPage("login");
+        return;
+      }
+    }
+
     // Simple guard: if no user and trying to access dashboard, redirect to login
     if (!user && DASH.includes(page)) {
       setPage("login");
