@@ -59,7 +59,7 @@ export function ResetPasswordPage({ onNavigate }: Props) {
 
       await supabase.auth.signOut();
 
-      onNavigate("login");
+      onNavigate("reset-password-success");
 
     } catch (err: any) {
       console.error("[ResetPassword] Exception:", err);

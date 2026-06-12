@@ -6,6 +6,7 @@ import { LandingPage } from "./components/LandingPage";
 import { LoginPage } from "./components/LoginPage";
 import { RegisterPage, ForgotPasswordPage, VerifyEmailPage } from "./components/AuthPages";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
+import { ResetPasswordSuccessPage } from "./components/ResetPasswordSuccessPage";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { DashboardHome } from "./components/DashboardHome";
 import { GeneratorPage } from "./components/GeneratorPage";
@@ -15,7 +16,7 @@ import { TermsPage } from "./components/TermsPage";
 import { PrivacyPage } from "./components/PrivacyPage";
 import { getAuthParamsFromUrl } from "../lib/supabase";
 
-export type Page = "landing" | "login" | "register" | "verify-email" | "forgot-password" | "reset-password" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
+export type Page = "landing" | "login" | "register" | "verify-email" | "forgot-password" | "reset-password" | "reset-password-success" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
 
 const DASH: Page[] = ["dashboard", "generator", "history", "profile"];
 const AUTH: Page[] = ["login", "register", "verify-email", "forgot-password"];
@@ -73,12 +74,10 @@ function AppInner() {
   useEffect(() => {
     if (authLoading) return;
 
-    // Never redirect away from reset-password while user has a valid session
+    // Never redirect away from reset-password or reset-password-success
     // (they need the session to call updateUser for password reset).
-    // IMPORTANT: Don't redirect when on reset-password page during initial recovery URL load,
-    // because the session hasn't been created yet from the recovery token.
-    if (page === "reset-password") {
-      return; // Stay on reset-password page - let Supabase process the recovery token
+    if (page === "reset-password" || page === "reset-password-success") {
+      return; // Stay on page - let Supabase process the recovery token
     }
 
     // Don't redirect during active password recovery flow
@@ -112,6 +111,7 @@ function AppInner() {
   if (page === "verify-email") return <VerifyEmailPage onNavigate={go} />;
   if (page === "forgot-password") return <ForgotPasswordPage onNavigate={go} />;
   if (page === "reset-password") return <ResetPasswordPage onNavigate={go} />;
+  if (page === "reset-password-success") return <ResetPasswordSuccessPage onNavigate={go} />;
   if (page === "terms") return <TermsPage onNavigate={go} />;
   if (page === "privacy") return <PrivacyPage onNavigate={go} />;
 
