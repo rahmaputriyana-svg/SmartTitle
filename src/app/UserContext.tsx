@@ -209,8 +209,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Detect password recovery from email link
         if (event === "PASSWORD_RECOVERY") {
           console.log("[Auth] PASSWORD_RECOVERY detected — setting recovery flag");
+          console.log("[Auth] NOT cleaning URL yet - keeping recovery token for updateUser");
           setPasswordRecovery(true);
-          cleanAuthUrl();
+          // DON'T clean URL here - token is needed for updateUser()
+          // cleanAuthUrl(); // ← REMOVED - will clean after successful password update
         }
 
         setUser(currentUser);

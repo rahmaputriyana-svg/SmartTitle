@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { useUser } from "../UserContext";
 import { Layout, Field, S } from "./AuthPages";
@@ -14,6 +14,25 @@ export function ResetPasswordPage({ onNavigate }: Props) {
   const [showNew, setShowNew] = useState(false);
   const [showConf, setShowConf] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Log recovery session info on mount
+  useEffect(() => {
+    console.log("[ResetPassword] Page opened");
+    console.log("[ResetPassword] Full URL:", window.location.href);
+    console.log("[ResetPassword] URL hash:", window.location.hash);
+    console.log("[ResetPassword] URL pathname:", window.location.pathname);
+
+    // Check if session exists from recovery token
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("[ResetPassword] getSession() result:", session ? "Session exists ✓" : "No session ✗");
+      if (session) {
+        console.log("[ResetPassword] Session user:", session.user.email);
+        console.log("[ResetPassword] Session type:", session.user.recovery_sent_at ? "recovery" : "normal");
+      } else {
+        console.warn("[ResetPassword] No session found - recovery token may not have been processed yet");
+      }
+    });
+  }, []);
 
   const passwordsMatch = newPass === confirmPass;
   const minLengthMet = newPass.length >= 8;
@@ -38,36 +57,63 @@ export function ResetPasswordPage({ onNavigate }: Props) {
     setLoading(true);
 
     try {
-      console.log("[ResetPassword] Mulai update password");
+      console.log("[ResetPassword] ========== START PASSWORD UPDATE ==========");
+      console.log("[ResetPassword] Current URL:", window.location.href);
+      console.log("[ResetPassword] Current hash:", window.location.hash);
 
-      const updatePromise = supabase.auth.updateUser({
+      // Check session before update
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log("[ResetPassword] Session before update:", sessionData?.session ? "EXISTS" : "NONE");
+      if (sessionData?.session) {
+        console.log("[ResetPassword] Session user:", sessionData.session.user.email);
+      }
+
+      console.log("[ResetPassword] Calling supabase.auth.updateUser...");
+
+      const { error } = await supabase.auth.updateUser({
         password: newPass,
       });
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Update password timeout")), 10000)
-      );
+      console.log("[ResetPassword] updateUser result - error:", error);
 
-      const result: any = await Promise.race([updatePromise, timeoutPromise]);
-
-      if (result?.error) {
-        toast.error(result.error.message);
+      if (error) {
+        console.error("[ResetPassword] UPDATE ERROR:");
+        console.error("[ResetPassword]   Code:", error.status);
+        console.error("[ResetPassword]   Message:", error.message);
+        console.error("[ResetPassword]   Details:", error);
+        toast.error(`Error: ${error.message}`);
         return;
       }
 
+      console.log("[ResetPassword] PASSWORD UPDATE SUCCESS ✓");
+
       toast.success("Password berhasil diperbarui. Silakan login.");
 
-      setLoading(false);
+      // Clear recovery flag
+      console.log("[ResetPassword] Clearing password recovery flag");
       clearPasswordRecovery();
 
+      // Set loading false BEFORE signOut
+      console.log("[ResetPassword] Setting loading to false");
+      setLoading(false);
+
+      // Delayed signOut and navigation
+      console.log("[ResetPassword] Scheduling signOut and navigation in 500ms");
       setTimeout(() => {
-        supabase.auth.signOut();
+        console.log("[ResetPassword] Calling supabase.auth.signOut()");
+        supabase.auth.signOut().catch((err) => {
+          console.error("[ResetPassword] signOut error (non-fatal):", err);
+        });
+        console.log("[ResetPassword] Navigating to login");
         onNavigate("login");
       }, 500);
 
-    } catch (err) {
-      console.error("[ResetPassword] Error:", err);
-      toast.error("Gagal memperbarui password. Silakan coba lagi.");
+    } catch (err: any) {
+      console.error("[ResetPassword] ========== CATCH ERROR ==========");
+      console.error("[ResetPassword] Error object:", err);
+      console.error("[ResetPassword] Error message:", err?.message || err);
+      console.error("[ResetPassword] Error stack:", err?.stack);
+      toast.error(`Gagal: ${err?.message || "Terjadi kesalahan tidak terduga"}`);
       setLoading(false);
     }
   };
