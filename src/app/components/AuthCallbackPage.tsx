@@ -40,13 +40,19 @@ export function AuthCallbackPage({ onNavigate }: Props) {
         return;
       }
 
-      // Check if this is an email verification callback
-      if (params.type !== "signup" && params.type !== "email_change") {
-        console.error("[AuthCallback] Invalid type:", params.type);
+      // Check if this is a valid auth callback
+      // Supabase PKCE may only bring ?code=xxxx without type=signup
+      const hasAuthCode = new URLSearchParams(window.location.search).has("code");
+      const hasValidType = params.type === "signup" || params.type === "email_change";
+
+      if (!hasAuthCode && !hasValidType) {
+        console.error("[AuthCallback] No auth code or valid type found");
         setStatus("error");
-        setMessage("Link verifikasi tidak valid. Silakan daftar ulang atau minta link verifikasi baru.");
+        setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa.");
         return;
       }
+
+      console.log("[AuthCallback] Valid callback detected:", { hasAuthCode, hasValidType, type: params.type });
 
       try {
         console.log("[AuthCallback] Getting session (Supabase will process PKCE token)...");
