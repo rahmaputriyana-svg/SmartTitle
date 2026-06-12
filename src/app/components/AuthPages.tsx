@@ -242,8 +242,8 @@ export function RegisterPage({ onNavigate }: Props) {
       setLoading(false);
     } else {
       sessionStorage.removeItem(REGISTER_STORAGE_KEY);
-      toast.success("Akun berhasil dibuat. Silakan login.");
-      onNavigate(redirect || "login");
+      toast.success("Akun berhasil dibuat. Email verifikasi telah dikirim. Silakan cek email Anda.");
+      onNavigate(redirect || "verify-email");
     }
   };
 

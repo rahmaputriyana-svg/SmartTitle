@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { LandingPage } from "./components/LandingPage";
 import { LoginPage } from "./components/LoginPage";
 import { RegisterPage, ForgotPasswordPage, VerifyEmailPage } from "./components/AuthPages";
+import { AuthCallbackPage } from "./components/AuthCallbackPage";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import { ResetPasswordSuccessPage } from "./components/ResetPasswordSuccessPage";
 import { DashboardLayout } from "./components/DashboardLayout";
@@ -16,7 +17,7 @@ import { TermsPage } from "./components/TermsPage";
 import { PrivacyPage } from "./components/PrivacyPage";
 import { getAuthParamsFromUrl } from "../lib/supabase";
 
-export type Page = "landing" | "login" | "register" | "verify-email" | "forgot-password" | "reset-password" | "reset-password-success" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
+export type Page = "landing" | "login" | "register" | "verify-email" | "forgot-password" | "reset-password" | "reset-password-success" | "auth-callback" | "dashboard" | "generator" | "history" | "profile" | "terms" | "privacy";
 
 const DASH: Page[] = ["dashboard", "generator", "history", "profile"];
 const AUTH: Page[] = ["login", "register", "verify-email", "forgot-password"];
@@ -43,6 +44,15 @@ function isRecoveryUrl(): boolean {
   return false;
 }
 
+function isAuthCallbackUrl(): boolean {
+  if (window.location.pathname === "/auth-callback") return true;
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  if (hashParams.get("type") === "signup") return true;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("type") === "signup") return true;
+  return false;
+}
+
 function hasAuthError(): boolean {
   const p = getAuthParamsFromUrl();
   return !!p.error;
@@ -52,6 +62,7 @@ function AppInner() {
   const [page, setPage] = useState<Page>(() => {
     // Detect auth callback URLs on initial load
     if (hasAuthError()) return "login"; // Show login page with error message
+    if (isAuthCallbackUrl()) return "auth-callback";
     if (isRecoveryUrl()) return "reset-password";
     return "landing";
   });
@@ -76,8 +87,9 @@ function AppInner() {
 
     // Never redirect away from reset-password or reset-password-success
     // (they need the session to call updateUser for password reset).
-    if (page === "reset-password" || page === "reset-password-success") {
-      return; // Stay on page - let Supabase process the recovery token
+    // Never redirect away from auth-callback (email verification).
+    if (page === "reset-password" || page === "reset-password-success" || page === "auth-callback") {
+      return; // Stay on page
     }
 
     // Don't redirect during active password recovery flow
@@ -112,6 +124,7 @@ function AppInner() {
   if (page === "forgot-password") return <ForgotPasswordPage onNavigate={go} />;
   if (page === "reset-password") return <ResetPasswordPage onNavigate={go} />;
   if (page === "reset-password-success") return <ResetPasswordSuccessPage onNavigate={go} />;
+  if (page === "auth-callback") return <AuthCallbackPage onNavigate={go} />;
   if (page === "terms") return <TermsPage onNavigate={go} />;
   if (page === "privacy") return <PrivacyPage onNavigate={go} />;
 

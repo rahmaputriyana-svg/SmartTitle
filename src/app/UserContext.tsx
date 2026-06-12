@@ -225,6 +225,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Detect email verification (signup confirmation)
+        // When user clicks email verification link, Supabase creates a session automatically.
+        // We must sign out immediately to prevent auto-login and redirect to auth-callback.
+        if (event === "SIGNED_IN" && currentUser?.email_confirmed_at) {
+          const isNewlyVerified = !currentUser.last_sign_in_at || 
+            new Date(currentUser.last_sign_in_at).getTime() - new Date(currentUser.email_confirmed_at).getTime() < 5000;
+          
+          if (isNewlyVerified) {
+            console.log("[Auth] Email just verified — signing out to prevent auto-login");
+            // Sign out immediately to prevent dashboard access
+            await supabase.auth.signOut();
+            setUser(null);
+            setAuthLoading(false);
+            return;
+          }
+        }
+
         setUser(currentUser);
         setAuthLoading(false);
 
@@ -275,19 +292,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         data: { name },
-        emailRedirectTo: `${window.location.origin}/reset-password`,
+        emailRedirectTo: `${window.location.origin}/auth-callback`,
       },
     });
     if (error) {
       console.log("[Auth] signUp error:", error.message);
       return { error: error.message };
     }
-    // Kill any auto-created session. If Supabase "Confirm email" is OFF,
-    // signUp creates a session immediately — we must destroy it so that
-    // registration does NOT count as login.
-    console.log("[Auth] signUp success — signing out to prevent auto-login");
-    await supabase.auth.signOut();
-    return { error: null, redirect: "login" };
+    // With email confirmation ON, signUp does NOT create a session.
+    // The user must verify email first, then login manually.
+    console.log("[Auth] signUp success — email verification required");
+    return { error: null, redirect: "verify-email" };
   }, []);
 
   const signOut = useCallback(async () => {
