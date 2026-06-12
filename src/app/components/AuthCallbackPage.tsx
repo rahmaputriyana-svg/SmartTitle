@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
-import { useUser } from "../UserContext";
 import { supabase, isSupabaseConfigured, getAuthParamsFromUrl, cleanAuthUrl } from "../../lib/supabase";
 import { toast } from "sonner";
 import { S } from "./AuthPages";
@@ -8,7 +7,6 @@ import { S } from "./AuthPages";
 interface Props { onNavigate: (p: string) => void }
 
 export function AuthCallbackPage({ onNavigate }: Props) {
-  const { setEmailVerificationResult } = useUser();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
 
@@ -20,79 +18,96 @@ export function AuthCallbackPage({ onNavigate }: Props) {
     }
 
     async function processCallback() {
+      console.log("[AuthCallback] Processing email verification...");
+      console.log("[AuthCallback] Current URL:", window.location.href);
+      
       const params = getAuthParamsFromUrl();
+      console.log("[AuthCallback] URL params:", params);
 
-      // Check for errors in URL
+      // Check for errors in URL first
       if (params.error) {
+        console.error("[AuthCallback] Error from URL:", params.error, params.errorDescription);
         setStatus("error");
-        setMessage(params.errorDescription || "Terjadi kesalahan saat verifikasi email.");
-        cleanAuthUrl();
+        
+        // Check for specific error types
+        const isExpired = params.error === "otp_expired" || params.error === "access_denied";
+        if (isExpired) {
+          setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan daftar ulang atau minta link verifikasi baru.");
+        } else {
+          setMessage(params.errorDescription || "Terjadi kesalahan saat verifikasi email.");
+        }
+        // Don't clean URL yet - let Supabase process it
         return;
       }
 
       // Check if this is an email verification callback
       if (params.type !== "signup" && params.type !== "email_change") {
+        console.error("[AuthCallback] Invalid type:", params.type);
         setStatus("error");
-        setMessage("Link verifikasi tidak valid.");
+        setMessage("Link verifikasi tidak valid. Silakan daftar ulang atau minta link verifikasi baru.");
         return;
       }
 
       try {
+        console.log("[AuthCallback] Getting session (Supabase will process PKCE token)...");
+        
         // Get the current session (Supabase PKCE exchanges the code automatically)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
+          console.error("[AuthCallback] Session error:", sessionError);
           setStatus("error");
           setMessage("Gagal memverifikasi email. Silakan coba lagi.");
-          cleanAuthUrl();
           return;
         }
 
         if (!session) {
+          console.error("[AuthCallback] No session found - token may be expired");
           setStatus("error");
-          setMessage("Sesi tidak ditemukan. Link mungkin sudah kedaluwarsa.");
-          cleanAuthUrl();
+          setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan daftar ulang atau minta link verifikasi baru.");
           return;
         }
+
+        console.log("[AuthCallback] Session found, checking email confirmation...");
+        console.log("[AuthCallback] Email confirmed at:", session.user.email_confirmed_at);
 
         // Verify the email is confirmed
         if (!session.user.email_confirmed_at) {
+          console.error("[AuthCallback] Email not confirmed");
           setStatus("error");
           setMessage("Email belum terverifikasi. Silakan cek inbox Anda.");
-          cleanAuthUrl();
           return;
         }
 
+        console.log("[AuthCallback] Email verified successfully! Signing out...");
+        
         // Email verified successfully — sign out immediately.
         // We don't want the user to be logged in after email verification.
         await supabase.auth.signOut();
-
-        // Set email verification result for toast on login page
-        setEmailVerificationResult({
-          success: true,
-          message: "Akun Anda telah berhasil diverifikasi. Silakan login.",
-        });
+        
+        console.log("[AuthCallback] Signed out. Cleaning URL...");
+        
+        // Now clean URL after Supabase has processed everything
+        cleanAuthUrl();
 
         setStatus("success");
-        setMessage("Email berhasil diverifikasi!");
-
-        // Clean URL
-        cleanAuthUrl();
+        setMessage("Akun Anda berhasil diverifikasi. Silakan login.");
 
         // Navigate to login after short delay
         setTimeout(() => {
+          toast.success("Akun Anda berhasil diverifikasi. Silakan login.");
           onNavigate("login");
         }, 1500);
 
       } catch (err) {
-        console.error("[AuthCallback] Error:", err);
+        console.error("[AuthCallback] Exception:", err);
         setStatus("error");
         setMessage("Terjadi kesalahan. Silakan coba lagi.");
       }
     }
 
     processCallback();
-  }, [onNavigate, setEmailVerificationResult]);
+  }, [onNavigate]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',sans-serif" }}>
