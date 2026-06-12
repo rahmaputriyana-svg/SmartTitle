@@ -14,22 +14,29 @@ export function ResetPasswordPage({ onNavigate }: Props) {
   const [showNew, setShowNew] = useState(false);
   const [showConf, setShowConf] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(null);
 
   // Log recovery session info on mount
   useEffect(() => {
-    console.log("[ResetPassword] Page opened");
+    console.log("[ResetPassword] ========== PAGE OPENED ==========");
     console.log("[ResetPassword] Full URL:", window.location.href);
     console.log("[ResetPassword] URL hash:", window.location.hash);
     console.log("[ResetPassword] URL pathname:", window.location.pathname);
 
     // Check if session exists from recovery token
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("[ResetPassword] getSession() result:", session ? "Session exists ✓" : "No session ✗");
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log("[ResetPassword] getSession() error:", error);
+      console.log("[ResetPassword] getSession() session:", session);
+      
       if (session) {
+        console.log("[ResetPassword] ✓ Session EXISTS");
         console.log("[ResetPassword] Session user:", session.user.email);
-        console.log("[ResetPassword] Session type:", session.user.recovery_sent_at ? "recovery" : "normal");
+        console.log("[ResetPassword] Session recovery_sent_at:", session.user.recovery_sent_at);
+        setHasRecoverySession(true);
       } else {
-        console.warn("[ResetPassword] No session found - recovery token may not have been processed yet");
+        console.error("[ResetPassword] ✗ NO SESSION FOUND");
+        console.error("[ResetPassword] Recovery token may be invalid or expired");
+        setHasRecoverySession(false);
       }
     });
   }, []);
@@ -38,82 +45,123 @@ export function ResetPasswordPage({ onNavigate }: Props) {
   const minLengthMet = newPass.length >= 8;
   const valid = minLengthMet && passwordsMatch && newPass.length > 0;
 
+  // Show invalid session banner if no recovery session
+  const showInvalidSessionBanner = hasRecoverySession === false;
+
   const handleSubmit = async () => {
+    console.log("[ResetPassword] ========== handleSubmit CALLED ==========");
+
     if (!newPass || !confirmPass) {
+      console.log("[ResetPassword] Validation failed: empty password");
       toast.error("Isi kata sandi baru dan konfirmasi kata sandi.");
       return;
     }
 
     if (newPass.length < 8) {
+      console.log("[ResetPassword] Validation failed: password too short");
       toast.error("Kata sandi minimal 8 karakter.");
       return;
     }
 
     if (newPass !== confirmPass) {
+      console.log("[ResetPassword] Validation failed: passwords don't match");
       toast.error("Konfirmasi kata sandi tidak cocok.");
       return;
     }
+
+    console.log("[ResetPassword] ✓ Validation passed");
 
     setLoading(true);
 
     try {
       console.log("[ResetPassword] ========== START PASSWORD UPDATE ==========");
-      console.log("[ResetPassword] Current URL:", window.location.href);
-      console.log("[ResetPassword] Current hash:", window.location.hash);
+      console.log("[ResetPassword] 1. Full URL:", window.location.href);
+      console.log("[ResetPassword] 2. URL hash:", window.location.hash);
+      console.log("[ResetPassword] 3. URL pathname:", window.location.pathname);
 
       // Check session before update
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log("[ResetPassword] Session before update:", sessionData?.session ? "EXISTS" : "NONE");
+      console.log("[ResetPassword] 4. Calling getSession()...");
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log("[ResetPassword] 5. getSession() result:");
+      console.log("   - sessionError:", sessionError);
+      console.log("   - session:", sessionData?.session);
+      console.log("   - has session:", !!sessionData?.session);
+
       if (sessionData?.session) {
-        console.log("[ResetPassword] Session user:", sessionData.session.user.email);
-      }
-
-      console.log("[ResetPassword] Calling supabase.auth.updateUser...");
-
-      const { error } = await supabase.auth.updateUser({
-        password: newPass,
-      });
-
-      console.log("[ResetPassword] updateUser result - error:", error);
-
-      if (error) {
-        console.error("[ResetPassword] UPDATE ERROR:");
-        console.error("[ResetPassword]   Code:", error.status);
-        console.error("[ResetPassword]   Message:", error.message);
-        console.error("[ResetPassword]   Details:", error);
-        toast.error(`Error: ${error.message}`);
+        console.log("[ResetPassword] 6. Session details:");
+        console.log("   - User ID:", sessionData.session.user.id);
+        console.log("   - User email:", sessionData.session.user.email);
+        console.log("   - Recovery sent at:", sessionData.session.user.recovery_sent_at);
+      } else {
+        console.error("[ResetPassword] ✗ NO RECOVERY SESSION");
+        console.error("[ResetPassword] Session is missing or invalid");
+        console.error("[ResetPassword] This means the recovery token is expired or invalid");
+        toast.error("Session reset password tidak valid. Silakan minta link reset baru.");
+        setLoading(false);
         return;
       }
 
-      console.log("[ResetPassword] PASSWORD UPDATE SUCCESS ✓");
+      // Call updateUser
+      console.log("[ResetPassword] 7. Calling supabase.auth.updateUser()...");
+      console.log("[ResetPassword] 8. New password length:", newPass.length);
+
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+        password: newPass,
+      });
+
+      console.log("[ResetPassword] 9. updateUser() result:");
+      console.log("   - updateError:", updateError);
+      console.log("   - updateData:", updateData);
+
+      if (updateError) {
+        console.error("[ResetPassword] ========== UPDATE ERROR ==========");
+        console.error("[ResetPassword] Error status:", updateError.status);
+        console.error("[ResetPassword] Error code:", updateError.code);
+        console.error("[ResetPassword] Error message:", updateError.message);
+        console.error("[ResetPassword] Error name:", updateError.name);
+        console.error("[ResetPassword] Full error object:", JSON.stringify(updateError, null, 2));
+        toast.error(`Error: ${updateError.message}`);
+        return;
+      }
+
+      console.log("[ResetPassword] ========== PASSWORD UPDATE SUCCESS ==========");
+      console.log("[ResetPassword] ✓ Password updated successfully");
+      console.log("[ResetPassword] Updated user:", updateData?.user?.email);
 
       toast.success("Password berhasil diperbarui. Silakan login.");
 
       // Clear recovery flag
-      console.log("[ResetPassword] Clearing password recovery flag");
+      console.log("[ResetPassword] 10. Clearing password recovery flag");
       clearPasswordRecovery();
 
       // Set loading false BEFORE signOut
-      console.log("[ResetPassword] Setting loading to false");
+      console.log("[ResetPassword] 11. Setting loading to false");
       setLoading(false);
 
       // Delayed signOut and navigation
-      console.log("[ResetPassword] Scheduling signOut and navigation in 500ms");
+      console.log("[ResetPassword] 12. Scheduling signOut and navigation in 500ms");
       setTimeout(() => {
-        console.log("[ResetPassword] Calling supabase.auth.signOut()");
+        console.log("[ResetPassword] 13. Calling supabase.auth.signOut()");
         supabase.auth.signOut().catch((err) => {
           console.error("[ResetPassword] signOut error (non-fatal):", err);
         });
-        console.log("[ResetPassword] Navigating to login");
+        console.log("[ResetPassword] 14. Navigating to login");
         onNavigate("login");
       }, 500);
 
     } catch (err: any) {
       console.error("[ResetPassword] ========== CATCH ERROR ==========");
+      console.error("[ResetPassword] Error type:", typeof err);
+      console.error("[ResetPassword] Error constructor:", err?.constructor?.name);
       console.error("[ResetPassword] Error object:", err);
       console.error("[ResetPassword] Error message:", err?.message || err);
       console.error("[ResetPassword] Error stack:", err?.stack);
+      console.error("[ResetPassword] Error toJSON:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       toast.error(`Gagal: ${err?.message || "Terjadi kesalahan tidak terduga"}`);
+    } finally {
+      console.log("[ResetPassword] ========== FINALLY BLOCK ==========");
+      console.log("[ResetPassword] Setting loading to false in finally");
       setLoading(false);
     }
   };
@@ -125,13 +173,22 @@ export function ResetPasswordPage({ onNavigate }: Props) {
   return (
     <Layout title="Buat Kata Sandi Baru" subtitle="Masukkan kata sandi baru untuk akun Anda" onNavigate={onNavigate}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} onKeyDown={handleKeyDown}>
-        {/* Info banner */}
-        <div style={{ padding: "0.875rem 1rem", borderRadius: 10, background: "#EDF5F1", border: "1px solid #BBF7D0", display: "flex", alignItems: "center", gap: "0.625rem" }}>
-          <ShieldCheck style={{ width: 16, height: 16, color: "#16A34A", flexShrink: 0 }} />
-          <p style={{ fontSize: "0.8rem", color: "#166534", lineHeight: 1.6 }}>
-            Link verifikasi valid. Silakan masukkan kata sandi baru.
-          </p>
-        </div>
+        {/* Info banner - show different message based on session validity */}
+        {showInvalidSessionBanner ? (
+          <div style={{ padding: "0.875rem 1rem", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <ShieldCheck style={{ width: 16, height: 16, color: "#DC2626", flexShrink: 0 }} />
+            <p style={{ fontSize: "0.8rem", color: "#991B1B", lineHeight: 1.6 }}>
+              Session reset password tidak valid. Silakan minta link reset baru.
+            </p>
+          </div>
+        ) : (
+          <div style={{ padding: "0.875rem 1rem", borderRadius: 10, background: "#EDF5F1", border: "1px solid #BBF7D0", display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <ShieldCheck style={{ width: 16, height: 16, color: "#16A34A", flexShrink: 0 }} />
+            <p style={{ fontSize: "0.8rem", color: "#166534", lineHeight: 1.6 }}>
+              Link verifikasi valid. Silakan masukkan kata sandi baru.
+            </p>
+          </div>
+        )}
 
         {/* New Password */}
         <Field label="Kata Sandi Baru" type={showNew ? "text" : "password"} placeholder="Min. 8 karakter" icon={Lock} value={newPass} onChange={setNewPass}
