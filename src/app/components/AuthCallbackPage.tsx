@@ -42,7 +42,11 @@ export function AuthCallbackPage({ onNavigate }: Props) {
 
       // Navigate to login after short delay
       setTimeout(() => {
-        toast.success("Akun Anda berhasil diverifikasi. Silakan login.");
+        // Show toast only once using sessionStorage flag
+        if (!sessionStorage.getItem("email_verified_toast_shown")) {
+          toast.success("Akun Anda berhasil diverifikasi. Silakan login.");
+          sessionStorage.setItem("email_verified_toast_shown", "true");
+        }
         onNavigate("login");
       }, 1500);
 
