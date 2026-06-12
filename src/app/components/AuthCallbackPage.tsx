@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
-import { supabase, isSupabaseConfigured, getAuthParamsFromUrl, cleanAuthUrl } from "../../lib/supabase";
+import { supabase, isSupabaseConfigured, cleanAuthUrl } from "../../lib/supabase";
+import { useUser } from "../UserContext";
 import { toast } from "sonner";
 import { S } from "./AuthPages";
 
 interface Props { onNavigate: (p: string) => void }
 
 export function AuthCallbackPage({ onNavigate }: Props) {
+  const { user } = useUser();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
 
@@ -17,107 +19,53 @@ export function AuthCallbackPage({ onNavigate }: Props) {
       return;
     }
 
-    async function processCallback() {
-      console.log("[AuthCallback] Processing email verification...");
-      console.log("[AuthCallback] Current URL:", window.location.href);
+    console.log("[AuthCallback] Checking user from context...");
+    console.log("[AuthCallback] User:", user?.email);
+    console.log("[AuthCallback] Email confirmed:", user?.email_confirmed_at);
+
+    // If user exists and email is confirmed, verification succeeded
+    if (user?.email_confirmed_at) {
+      console.log("[AuthCallback] Email verified successfully!");
       
-      const params = getAuthParamsFromUrl();
-      console.log("[AuthCallback] URL params:", params);
+      setStatus("success");
+      setMessage("Akun Anda berhasil diverifikasi. Silakan login.");
 
-      // Check for errors in URL first
-      if (params.error) {
-        console.error("[AuthCallback] Error from URL:", params.error, params.errorDescription);
-        setStatus("error");
-        
-        // Check for specific error types
-        const isExpired = params.error === "otp_expired" || params.error === "access_denied";
-        if (isExpired) {
-          setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan daftar ulang atau minta link verifikasi baru.");
-        } else {
-          setMessage(params.errorDescription || "Terjadi kesalahan saat verifikasi email.");
-        }
-        // Don't clean URL yet - let Supabase process it
-        return;
-      }
+      // Clean URL
+      cleanAuthUrl();
 
-      // Check if this is a valid auth callback
-      // Supabase PKCE may only bring ?code=xxxx without type=signup
-      const hasAuthCode = new URLSearchParams(window.location.search).has("code");
-      const hasValidType = params.type === "signup" || params.type === "email_change";
+      // Sign out after setting success state
+      supabase.auth.signOut().then(() => {
+        console.log("[AuthCallback] Signed out successfully");
+      }).catch(err => {
+        console.error("[AuthCallback] Sign out error:", err);
+      });
 
-      if (!hasAuthCode && !hasValidType) {
-        console.error("[AuthCallback] No auth code or valid type found");
-        setStatus("error");
-        setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa.");
-        return;
-      }
+      // Navigate to login after short delay
+      setTimeout(() => {
+        toast.success("Akun Anda berhasil diverifikasi. Silakan login.");
+        onNavigate("login");
+      }, 1500);
 
-      console.log("[AuthCallback] Valid callback detected:", { hasAuthCode, hasValidType, type: params.type });
-
-      try {
-        console.log("[AuthCallback] Getting session (Supabase will process PKCE token)...");
-        
-        // Get the current session (Supabase PKCE exchanges the code automatically)
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        console.log("[AuthCallback] Session:", session);
-        console.log("[AuthCallback] Email confirmed:", session?.user?.email_confirmed_at);
-
-        if (sessionError) {
-          console.error("[AuthCallback] Verification failed:", sessionError);
-          setStatus("error");
-          setMessage("Gagal memverifikasi email. Silakan coba lagi.");
-          return;
-        }
-
-        if (!session) {
-          console.error("[AuthCallback] No session found - token may be expired");
-          setStatus("error");
-          setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan daftar ulang atau minta link verifikasi baru.");
-          return;
-        }
-
-        console.log("[AuthCallback] Session found, checking email confirmation...");
-        console.log("[AuthCallback] Email confirmed at:", session.user.email_confirmed_at);
-
-        // Verify the email is confirmed
-        if (!session.user.email_confirmed_at) {
-          console.error("[AuthCallback] Email not confirmed");
-          setStatus("error");
-          setMessage("Email belum terverifikasi. Silakan cek inbox Anda.");
-          return;
-        }
-
-        console.log("[AuthCallback] Verification success");
-        console.log("[AuthCallback] Email verified successfully! Signing out...");
-        
-        // Email verified successfully
-        setStatus("success");
-        setMessage("Akun Anda berhasil diverifikasi. Silakan login.");
-
-        // Clean URL
-        cleanAuthUrl();
-
-        // Sign out after setting success state
-        await supabase.auth.signOut();
-        
-        console.log("[AuthCallback] Signed out. Cleaning URL...");
-
-        // Navigate to login after short delay
-        setTimeout(() => {
-          toast.success("Akun Anda berhasil diverifikasi. Silakan login.");
-          onNavigate("login");
-        }, 1500);
-
-      } catch (err) {
-        console.error("[AuthCallback] Exception:", err);
-        setStatus("error");
-        setMessage("Terjadi kesalahan. Silakan coba lagi.");
-      }
+      return;
     }
 
-    processCallback();
-  }, [onNavigate]);
+    // If user exists but email not confirmed yet, keep loading
+    if (user && !user.email_confirmed_at) {
+      console.log("[AuthCallback] User exists but email not confirmed yet, waiting...");
+      return;
+    }
+
+    // Timeout after 10 seconds - if no user, show error
+    const timeout = setTimeout(() => {
+      if (!user) {
+        console.error("[AuthCallback] Timeout - no user after 10 seconds");
+        setStatus("error");
+        setMessage("Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan daftar ulang atau minta link verifikasi baru.");
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [user, onNavigate]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',sans-serif" }}>

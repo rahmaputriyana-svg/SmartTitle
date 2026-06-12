@@ -225,6 +225,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Detect email verification callback - user clicks email link, Supabase creates session
+        // When pathname is /auth-callback, just set user and stop. Don't load data, don't sign out.
+        // AuthCallbackPage will handle the verification flow.
+        if (event === "SIGNED_IN" && window.location.pathname === "/auth-callback") {
+          console.log("[Auth] Email verification callback session detected");
+          console.log("[Auth] User:", currentUser?.email, "| Email confirmed:", currentUser?.email_confirmed_at);
+          console.log("[Auth] NOT loading profile/history/favorites - email verification flow only");
+          
+          setUser(currentUser);
+          setAuthLoading(false);
+          // DON'T loadProfile - prevents database lock during verification
+          // DON'T loadHistory - prevents database lock during verification
+          // DON'T loadFavorites - prevents database lock during verification
+          // DON'T signOut - let AuthCallbackPage control when to sign out
+          return;
+        }
+
         // Email verification is handled by AuthCallbackPage
         // Don't sign out here - let AuthCallbackPage process the session first
 
