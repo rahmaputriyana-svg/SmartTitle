@@ -242,6 +242,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // CRITICAL: Ignore email verification SIGNED_IN events on NON-callback tabs
+        // When user clicks email link in Gmail, Supabase broadcasts SIGNED_IN to ALL tabs
+        // Only the /auth-callback tab should process it. Other tabs must ignore it.
+        if (event === "SIGNED_IN" && currentUser?.email_confirmed_at) {
+          const isAuthCallbackTab = window.location.pathname === "/auth-callback";
+          const isPasswordResetTab = window.location.pathname === "/reset-password";
+          
+          // If this tab is NOT the auth-callback tab, ignore the verification session
+          if (!isAuthCallbackTab && !isPasswordResetTab) {
+            console.log("[Auth] Ignoring verification session on non-callback tab:", window.location.pathname);
+            console.log("[Auth] This tab should NOT process email verification");
+            // DON'T set user - this is not this tab's verification
+            // DON'T loadProfile - prevents loading wrong user data
+            // DON'T loadHistory - prevents loading wrong user data
+            // DON'T loadFavorites - prevents loading wrong user data
+            // Keep this tab's current state unchanged
+            return;
+          }
+        }
+
         // Email verification is handled by AuthCallbackPage
         // Don't sign out here - let AuthCallbackPage process the session first
 

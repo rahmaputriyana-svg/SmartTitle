@@ -95,6 +95,22 @@ function AppInner() {
     // Don't redirect during active password recovery flow
     if (passwordRecovery) return;
 
+    // CRITICAL: When email verification happens, Supabase broadcasts SIGNED_IN to ALL tabs
+    // Only the /auth-callback tab should process the verification.
+    // Other tabs (landing, login, register) must NOT auto-redirect when they detect a user.
+    // This prevents other tabs from navigating away when Gmail opens the verification link.
+    if (user && window.location.pathname !== "/auth-callback") {
+      const isOnAuthOrPublicPage = AUTH.includes(page) || PUBLIC.includes(page) || page === "landing";
+      
+      // If user is on landing/auth pages and a user session appears (from email verification in another tab),
+      // DON'T redirect them. They should stay on their current page.
+      if (isOnAuthOrPublicPage) {
+        console.log("[App] Ignoring user session on non-dashboard tab:", window.location.pathname);
+        console.log("[App] Keeping tab on current page, not redirecting to dashboard");
+        return;
+      }
+    }
+
     // CRITICAL: After email verification, user is signed out immediately by AuthCallbackPage.
     // Even if there's a brief moment with a session, don't auto-navigate to dashboard.
     // User MUST manually login via LoginPage to access dashboard.
