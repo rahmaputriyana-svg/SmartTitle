@@ -69,6 +69,7 @@ function AppInner() {
   const { user, authLoading, passwordRecovery, clearPasswordRecovery, authError, clearAuthError } = useUser();
 
   const go = (p: string) => {
+    console.log("[Navigation]", page, "->", p);
     setPage(p as Page);
     window.scrollTo({ top: 0 });
   };
@@ -119,7 +120,7 @@ function AppInner() {
       // If user just arrived at dashboard without going through LoginPage, redirect to login
       const cameFromAuthCallback = document.referrer.includes("auth-callback");
       if (cameFromAuthCallback) {
-        console.log("[App] Preventing auto-dashboard after email verification");
+        console.log("[Navigation] dashboard -> login (preventing auto-dashboard after email verification)");
         setPage("login");
         return;
       }
@@ -127,6 +128,7 @@ function AppInner() {
 
     // Simple guard: if no user and trying to access dashboard, redirect to login
     if (!user && DASH.includes(page)) {
+      console.log("[Navigation]", page, "-> login (no user, redirecting to login)");
       setPage("login");
     }
   }, [user, authLoading, page, passwordRecovery]);
