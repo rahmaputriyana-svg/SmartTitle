@@ -20,17 +20,22 @@ export function LoginPage({ onNavigate, onLoginSuccess }: Props) {
   const submit = async () => {
     if (!email || !pass) { toast.error("Isi email dan kata sandi terlebih dahulu."); return; }
     setLoading(true);
+    console.log("[LOGIN] Attempting login for:", email);
     const { error } = await signIn(email, pass);
+    console.log("[LOGIN] signIn result - error:", error);
     if (error) {
       toast.error(error.includes("Invalid") ? "Email atau kata sandi salah." : error);
       setLoading(false);
     } else {
+      console.log("[LOGIN] success");
       toast.success("Login berhasil!");
       // Use onLoginSuccess callback to ensure consistent navigation
       if (onLoginSuccess) {
+        console.log("[LOGIN] calling onLoginSuccess()");
         onLoginSuccess();
       } else {
         // Fallback to direct navigation if callback not provided
+        console.log("[LOGIN] calling onNavigate('dashboard')");
         onNavigate("dashboard");
       }
     }

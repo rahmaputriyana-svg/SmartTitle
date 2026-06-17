@@ -100,7 +100,9 @@ function AppInner() {
 
   const go = (p: string) => {
     const nextPage = p as Page;
-    console.log("[Navigation]", page, "->", nextPage);
+    console.log("[GO]");
+    console.log("old page =", page);
+    console.log("new page =", p);
     console.log("[Navigation] Current user:", user?.email || "null");
     console.log("[Navigation] Current pathname:", window.location.pathname);
     setPage(nextPage);
@@ -170,7 +172,17 @@ function AppInner() {
 
   // Redirect based on auth state
   useEffect(() => {
-    if (authLoading) return;
+    console.log("[APP]");
+    console.log("page =", page);
+    console.log("pathname =", window.location.pathname);
+    console.log("user =", user?.email);
+    console.log("authLoading =", authLoading);
+    console.log("loginSuccess =", loginSuccess);
+
+    if (authLoading) {
+      console.log("RedirectGuard: return because authLoading");
+      return;
+    }
 
     console.log("[RedirectGuard] page:", page, "| user:", user?.email || "null", "| authLoading:", authLoading);
 
@@ -178,16 +190,19 @@ function AppInner() {
     // (they need the session to call updateUser for password reset).
     // Never redirect away from auth-callback (email verification).
     if (page === "reset-password" || page === "reset-password-success" || page === "auth-callback") {
-      console.log("[RedirectGuard] On auth page, not redirecting");
+      console.log("RedirectGuard: return because on auth page (reset-password/auth-callback)");
       return; // Stay on page
     }
 
     // Don't redirect during active password recovery flow
-    if (passwordRecovery) return;
+    if (passwordRecovery) {
+      console.log("RedirectGuard: return because passwordRecovery");
+      return;
+    }
 
     // CRITICAL: Handle successful login - force navigation to dashboard
     if (loginSuccess && user) {
-      console.log("[RedirectGuard] Login success detected, navigating to dashboard");
+      console.log("RedirectGuard: loginSuccess && user detected, forcing dashboard");
       setLoginSuccess(false);
       setPage("dashboard");
       window.history.pushState({}, "", "/dashboard");
@@ -206,8 +221,7 @@ function AppInner() {
       // EXCEPTION: If user just logged in from LoginPage (page === "login" and they navigated to dashboard),
       // allow the navigation to proceed.
       if (isOnAuthOrPublicPage && page !== "login" && !loginSuccess) {
-        console.log("[App] Ignoring user session on non-callback tab:", window.location.pathname);
-        console.log("[App] Keeping tab on current page, not redirecting to dashboard");
+        console.log("RedirectGuard: ignored (email verification on non-callback tab)");
         return;
       }
     }
@@ -220,7 +234,7 @@ function AppInner() {
       // If user just arrived at dashboard without going through LoginPage, redirect to login
       const cameFromAuthCallback = document.referrer.includes("auth-callback");
       if (cameFromAuthCallback) {
-        console.log("[Navigation] dashboard -> login (preventing auto-dashboard after email verification)");
+        console.log("RedirectGuard: redirect dashboard -> login (preventing auto-dashboard after email verification)");
         setPage("login");
         return;
       }
@@ -228,10 +242,13 @@ function AppInner() {
 
     // Simple guard: if no user and trying to access dashboard, redirect to login
     if (!user && DASH.includes(page)) {
-      console.log("[Navigation]", page, "-> login (no user, redirecting to login)");
+      console.log("RedirectGuard: redirect", page, "-> login (no user)");
       setPage("login");
+      return;
     }
-  }, [user, authLoading, page, passwordRecovery]);
+
+    console.log("RedirectGuard: ignored (no action needed)");
+  }, [user, authLoading, page, passwordRecovery, loginSuccess]);
 
   // Show toast for auth errors from URL
   useEffect(() => {
@@ -248,6 +265,10 @@ function AppInner() {
   }, [authError, clearAuthError]);
 
   if (authLoading) return <LoadingScreen />;
+
+  console.log("[RENDER] Rendering page:", page);
+  console.log("[RENDER] URL pathname:", window.location.pathname);
+  console.log("[RENDER] user:", user?.email || "null");
 
   if (page === "landing") return <LandingPage onNavigate={go} />;
   if (page === "login") return (
