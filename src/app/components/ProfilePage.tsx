@@ -348,14 +348,33 @@ export function ProfilePage({ onNavigate }: Props) {
   const field = (label: string, key: keyof typeof draft, icon: any, type = "text") => {
     const Icon = icon;
     const [f, setF] = useState(false);
+    
+    // Determine if this field should be numeric-only
+    const isNumericField = key === "nim" || key === "angkatan";
+    
+    const handleChange = (value: string) => {
+      if (isNumericField) {
+        // Only allow digits - strip out any non-digit characters
+        const digitsOnly = value.replace(/\D/g, "");
+        setDraft(p => ({ ...p, [key]: digitsOnly }));
+      } else {
+        setDraft(p => ({ ...p, [key]: value }));
+      }
+    };
+    
     return (
       <div>
         <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: S.dark, marginBottom: "0.3rem" }}>{label}</label>
         <div style={{ position: "relative" }}>
           <Icon style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: f ? S.gold : "#C4B9AA" }} />
-          <input type={type} value={editing ? draft[key] ?? "" : profile[key] ?? ""}
-            onChange={e => setDraft(p => ({ ...p, [key]: e.target.value }))}
-            readOnly={!editing} onFocus={() => setF(true)} onBlur={() => setF(false)}
+          <input 
+            type={isNumericField ? "text" : type} 
+            inputMode={isNumericField ? "numeric" : undefined}
+            value={editing ? draft[key] ?? "" : profile[key] ?? ""}
+            onChange={e => handleChange(e.target.value)}
+            readOnly={!editing} 
+            onFocus={() => setF(true)} 
+            onBlur={() => setF(false)}
             style={{ width: "100%", padding: "0.6rem 0.875rem 0.6rem 2.25rem", borderRadius: 9, border: `1px solid ${editing && f ? S.gold : editing ? S.border : "#F0EBE4"}`, background: editing ? (f ? S.white : S.inputBg) : "#FAFAF7", fontSize: "0.875rem", color: S.dark, outline: "none", boxSizing: "border-box", boxShadow: editing && f ? "0 0 0 3px rgba(196,147,63,0.1)" : "none", cursor: editing ? "text" : "default", transition: "all 0.15s" }} />
         </div>
       </div>
