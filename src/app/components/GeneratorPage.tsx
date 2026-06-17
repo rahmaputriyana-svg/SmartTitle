@@ -226,7 +226,7 @@ export function GeneratorPage() {
                 style={{ width: "100%", padding: "0.65rem 0.875rem", borderRadius: 10, border: `1px solid ${S.border}`, background: S.bg, fontSize: "0.875rem", color: S.dark, outline: "none", cursor: "pointer", boxSizing: "border-box" }}
                 onFocus={e => { e.target.style.borderColor = S.gold; e.target.style.boxShadow = "0 0 0 3px rgba(196,147,63,0.12)"; }}
                 onBlur={e => { e.target.style.borderColor = S.border; e.target.style.boxShadow = "none"; }}>
-                {[3,5,8,10].map(n => <option key={n} value={n}>{n} judul</option>)}
+                {[3,5,8].map(n => <option key={n} value={n}>{n} judul</option>)}
               </select>
             </div>
           </div>
