@@ -49,8 +49,8 @@ export function Field({
 export function Layout({ children, title, subtitle, onNavigate }: { children: React.ReactNode; title: string; subtitle: string; onNavigate: (p: string) => void }) {
   return (
     <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',sans-serif" }}>
-      {/* Left panel */}
-      <div className="hidden lg:flex" style={{ width: "42%", background: "#1C1917", flexDirection: "column", justifyContent: "space-between", padding: "2.5rem" }}>
+      {/* Left panel - hidden on mobile */}
+      <div className="hidden lg:flex" style={{ width: "42%", background: "#1C1917", flexDirection: "column", justifyContent: "space-between", padding: "clamp(1.5rem,4vw,2.5rem)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <img src="/logo.png" alt="SmartTitle AI" style={{ width: 32, height: 32, borderRadius: 9, objectFit: "contain" }} />
           <span style={{ fontWeight: 700, color: "#fff", fontSize: "1rem" }}>SmartTitle <span style={{ color: S.gold }}>AI</span></span>
@@ -58,30 +58,30 @@ export function Layout({ children, title, subtitle, onNavigate }: { children: Re
 
         <div>
           <p style={{ fontSize: "0.72rem", fontWeight: 700, color: S.gold, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1rem" }}>Powered by Gemini AI</p>
-          <h2 style={{ fontSize: "2rem", fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: "1rem" }}>
             Temukan Judul<br />Penelitian Terbaik
           </h2>
-          <p style={{ fontSize: "0.875rem", color: "#A8A29E", lineHeight: 1.75 }}>
+          <p style={{ fontSize: "clamp(0.8125rem,2vw,0.875rem)", color: "#A8A29E", lineHeight: 1.75 }}>
             Platform berbasis AI untuk mahasiswa, dosen, dan peneliti yang ingin menemukan judul skripsi tepat sasaran.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem", marginTop: "2rem" }}>
             {[["50K+","Judul Dibuat"],["12K+","Pengguna"],["4.9★","Rating"]].map(([v, l], i) => (
-              <div key={i} style={{ textAlign: "center", padding: "0.875rem 0.5rem", borderRadius: 10, background: "rgba(255,255,255,0.05)" }}>
-                <p style={{ fontSize: "1.25rem", fontWeight: 800, color: "#fff" }}>{v}</p>
+              <div key={i} style={{ textAlign: "center", padding: "clamp(0.75rem,2vw,0.875rem) 0.5rem", borderRadius: 10, background: "rgba(255,255,255,0.05)" }}>
+                <p style={{ fontSize: "clamp(1.125rem,3vw,1.25rem)", fontWeight: 800, color: "#fff" }}>{v}</p>
                 <p style={{ fontSize: "0.68rem", color: "#A8A29E", marginTop: "0.125rem" }}>{l}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div style={{ padding: "1.125rem 1.25rem", borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ fontSize: "0.82rem", color: "#D6CFC6", fontStyle: "italic", lineHeight: 1.7, marginBottom: "0.875rem" }}>
+        <div style={{ padding: "clamp(1rem,3vw,1.125rem) clamp(1rem,3vw,1.25rem)", borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ fontSize: "clamp(0.75rem,2vw,0.82rem)", color: "#D6CFC6", fontStyle: "italic", lineHeight: 1.7, marginBottom: "0.875rem" }}>
             "SmartTitle AI membantu saya menemukan judul skripsi yang tepat dalam hitungan menit."
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: S.gold, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "#fff" }}>RP</div>
             <div>
-              <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#fff" }}>Reza Pratama</p>
+              <p style={{ fontSize: "clamp(0.75rem,2vw,0.78rem)", fontWeight: 600, color: "#fff" }}>Reza Pratama</p>
               <p style={{ fontSize: "0.68rem", color: "#A8A29E" }}>Mahasiswa Teknik Informatika</p>
             </div>
           </div>
@@ -89,22 +89,22 @@ export function Layout({ children, title, subtitle, onNavigate }: { children: Re
       </div>
 
       {/* Right panel */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "2rem 1.5rem", background: "#FAFAF8" }}>
-        <div style={{ width: "100%", maxWidth: 400 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "clamp(1.5rem,4vw,2rem) clamp(1rem,3vw,1.5rem)", background: "#FAFAF8" }}>
+        <div style={{ width: "100%", maxWidth: 400, padding: "0 0.5rem" }}>
           {/* mobile logo */}
           <div className="flex lg:hidden" style={{ alignItems: "center", gap: "0.5rem", marginBottom: "2rem" }}>
             <img src="/logo.png" alt="SmartTitle AI" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "contain" }} />
             <span style={{ fontWeight: 700, fontSize: "0.95rem", color: S.dark }}>SmartTitle <span style={{ color: S.gold }}>AI</span></span>
           </div>
 
-          <button onClick={() => onNavigate("landing")} style={{ display: "flex", alignItems: "center", gap: "0.375rem", background: "none", border: "none", cursor: "pointer", color: "#A8A29E", fontSize: "0.8rem", marginBottom: "1.75rem", padding: 0 }}
+          <button onClick={() => onNavigate("landing")} style={{ display: "flex", alignItems: "center", gap: "0.375rem", background: "none", border: "none", cursor: "pointer", color: "#A8A29E", fontSize: "0.8rem", marginBottom: "clamp(1.25rem,4vw,1.75rem)", padding: 0 }}
             onMouseEnter={e => (e.currentTarget.style.color = S.dark)}
             onMouseLeave={e => (e.currentTarget.style.color = "#A8A29E")}>
             <ArrowLeft style={{ width: 14, height: 14 }} /> Kembali
           </button>
 
-          <h1 style={{ fontSize: "1.625rem", fontWeight: 700, color: S.dark, marginBottom: "0.375rem" }}>{title}</h1>
-          <p style={{ fontSize: "0.875rem", color: S.muted, marginBottom: "1.75rem" }}>{subtitle}</p>
+          <h1 style={{ fontSize: "clamp(1.375rem,4vw,1.625rem)", fontWeight: 700, color: S.dark, marginBottom: "0.375rem" }}>{title}</h1>
+          <p style={{ fontSize: "clamp(0.8125rem,2vw,0.875rem)", color: S.muted, marginBottom: "clamp(1.25rem,4vw,1.75rem)" }}>{subtitle}</p>
 
           {children}
         </div>
