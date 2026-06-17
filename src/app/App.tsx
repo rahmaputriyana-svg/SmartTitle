@@ -60,10 +60,39 @@ function hasAuthError(): boolean {
 
 function AppInner() {
   const [page, setPage] = useState<Page>(() => {
-    // Detect auth callback URLs on initial load
-    if (hasAuthError()) return "login"; // Show login page with error message
+    // Detect page from URL pathname on initial load
+    const pathname = window.location.pathname;
+    
+    // Check for auth errors first
+    if (hasAuthError()) return "login";
+    
+    // Map pathname to page
+    const pathToPage: Record<string, Page> = {
+      "/": "landing",
+      "/login": "login",
+      "/register": "register",
+      "/verify-email": "verify-email",
+      "/forgot-password": "forgot-password",
+      "/reset-password": "reset-password",
+      "/reset-password-success": "reset-password-success",
+      "/auth-callback": "auth-callback",
+      "/dashboard": "dashboard",
+      "/generator": "generator",
+      "/history": "history",
+      "/profile": "profile",
+      "/terms": "terms",
+      "/privacy": "privacy",
+    };
+    
+    // Check if pathname matches a known page
+    if (pathToPage[pathname]) {
+      return pathToPage[pathname];
+    }
+    
+    // Fallback: check for hash/query params (for auth callbacks)
     if (isAuthCallbackUrl()) return "auth-callback";
     if (isRecoveryUrl()) return "reset-password";
+    
     return "landing";
   });
   const { user, authLoading, passwordRecovery, clearPasswordRecovery, authError, clearAuthError } = useUser();
@@ -72,6 +101,27 @@ function AppInner() {
     console.log("[Navigation]", page, "->", p);
     setPage(p as Page);
     window.scrollTo({ top: 0 });
+
+    // Update browser URL to match the current page
+    const pathMap: Record<string, string> = {
+      landing: "/",
+      login: "/login",
+      register: "/register",
+      "verify-email": "/verify-email",
+      "forgot-password": "/forgot-password",
+      "reset-password": "/reset-password",
+      "reset-password-success": "/reset-password-success",
+      "auth-callback": "/auth-callback",
+      dashboard: "/dashboard",
+      generator: "/generator",
+      history: "/history",
+      profile: "/profile",
+      terms: "/terms",
+      privacy: "/privacy",
+    };
+
+    const targetPath = pathMap[p] || "/";
+    window.history.pushState({}, "", targetPath);
   };
 
   // Handle PASSWORD_RECOVERY event from Supabase (e.g. in-app hash change)
@@ -81,6 +131,37 @@ function AppInner() {
       clearPasswordRecovery();
     }
   }, [passwordRecovery, clearPasswordRecovery]);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname;
+      const pathToPage: Record<string, Page> = {
+        "/": "landing",
+        "/login": "login",
+        "/register": "register",
+        "/verify-email": "verify-email",
+        "/forgot-password": "forgot-password",
+        "/reset-password": "reset-password",
+        "/reset-password-success": "reset-password-success",
+        "/auth-callback": "auth-callback",
+        "/dashboard": "dashboard",
+        "/generator": "generator",
+        "/history": "history",
+        "/profile": "profile",
+        "/terms": "terms",
+        "/privacy": "privacy",
+      };
+
+      if (pathToPage[pathname]) {
+        console.log("[PopState] Browser navigation to:", pathname);
+        setPage(pathToPage[pathname]);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Redirect based on auth state
   useEffect(() => {
