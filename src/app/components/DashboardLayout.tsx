@@ -47,12 +47,21 @@ export function DashboardLayout({ children, activePage, onNavigate }: Props) {
 
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.125rem 1.25rem", borderBottom: "1px solid #1E293B" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button
+            onClick={() => { onNavigate("dashboard"); setIsSidebarOpen(false); }}
+            aria-label="Kembali ke Dashboard"
+            style={{
+              display: "flex", alignItems: "center", gap: "0.5rem",
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+              transition: "opacity 0.15s, transform 0.15s"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; e.currentTarget.style.transform = "scale(1.02)"; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; }}>
             <img src="/logo.png" alt="SmartTitle AI" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "contain" }} />
             <span style={{ fontWeight: 700, color: "#fff", fontSize: "0.9rem" }}>
               SmartTitle <span style={{ color: "#C4933F" }}>AI</span>
             </span>
-          </div>
+          </button>
           {/* Close button — only visible on mobile */}
           <button type="button" onClick={() => setIsSidebarOpen(false)} className="flex lg:hidden"
             style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B", padding: "0.375rem" }}>
