@@ -99,6 +99,8 @@ function AppInner() {
 
   const go = (p: string) => {
     console.log("[Navigation]", page, "->", p);
+    console.log("[Navigation] Current user:", user?.email || "null");
+    console.log("[Navigation] Current pathname:", window.location.pathname);
     setPage(p as Page);
     window.scrollTo({ top: 0 });
 
@@ -121,6 +123,7 @@ function AppInner() {
     };
 
     const targetPath = pathMap[p] || "/";
+    console.log("[Navigation] Updating URL to:", targetPath);
     window.history.pushState({}, "", targetPath);
   };
 
@@ -167,10 +170,13 @@ function AppInner() {
   useEffect(() => {
     if (authLoading) return;
 
+    console.log("[RedirectGuard] page:", page, "| user:", user?.email || "null", "| authLoading:", authLoading);
+
     // Never redirect away from reset-password or reset-password-success
     // (they need the session to call updateUser for password reset).
     // Never redirect away from auth-callback (email verification).
     if (page === "reset-password" || page === "reset-password-success" || page === "auth-callback") {
+      console.log("[RedirectGuard] On auth page, not redirecting");
       return; // Stay on page
     }
 
@@ -179,15 +185,17 @@ function AppInner() {
 
     // CRITICAL: When email verification happens, Supabase broadcasts SIGNED_IN to ALL tabs
     // Only the /auth-callback tab should process the verification.
-    // Other tabs (landing, login, register) must NOT auto-redirect when they detect a user.
-    // This prevents other tabs from navigating away when Gmail opens the verification link.
+    // Other tabs (landing, login, register) must NOT auto-redirect when they detect a user FROM EMAIL VERIFICATION.
+    // However, if user is on LoginPage and manually logs in, they SHOULD go to dashboard.
     if (user && window.location.pathname !== "/auth-callback") {
       const isOnAuthOrPublicPage = AUTH.includes(page) || PUBLIC.includes(page) || page === "landing";
       
       // If user is on landing/auth pages and a user session appears (from email verification in another tab),
       // DON'T redirect them. They should stay on their current page.
-      if (isOnAuthOrPublicPage) {
-        console.log("[App] Ignoring user session on non-dashboard tab:", window.location.pathname);
+      // EXCEPTION: If user just logged in from LoginPage (page === "login" and they navigated to dashboard),
+      // allow the navigation to proceed.
+      if (isOnAuthOrPublicPage && page !== "login") {
+        console.log("[App] Ignoring user session on non-callback tab:", window.location.pathname);
         console.log("[App] Keeping tab on current page, not redirecting to dashboard");
         return;
       }
