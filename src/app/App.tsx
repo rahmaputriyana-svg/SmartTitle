@@ -95,17 +95,19 @@ function AppInner() {
     
     return "landing";
   });
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const { user, authLoading, passwordRecovery, clearPasswordRecovery, authError, clearAuthError } = useUser();
 
   const go = (p: string) => {
-    console.log("[Navigation]", page, "->", p);
+    const nextPage = p as Page;
+    console.log("[Navigation]", page, "->", nextPage);
     console.log("[Navigation] Current user:", user?.email || "null");
     console.log("[Navigation] Current pathname:", window.location.pathname);
-    setPage(p as Page);
+    setPage(nextPage);
     window.scrollTo({ top: 0 });
 
     // Update browser URL to match the current page
-    const pathMap: Record<string, string> = {
+    const pathMap: Record<Page, string> = {
       landing: "/",
       login: "/login",
       register: "/register",
@@ -122,7 +124,7 @@ function AppInner() {
       privacy: "/privacy",
     };
 
-    const targetPath = pathMap[p] || "/";
+    const targetPath = pathMap[nextPage] || "/";
     console.log("[Navigation] Updating URL to:", targetPath);
     window.history.pushState({}, "", targetPath);
   };
@@ -183,6 +185,15 @@ function AppInner() {
     // Don't redirect during active password recovery flow
     if (passwordRecovery) return;
 
+    // CRITICAL: Handle successful login - force navigation to dashboard
+    if (loginSuccess && user) {
+      console.log("[RedirectGuard] Login success detected, navigating to dashboard");
+      setLoginSuccess(false);
+      setPage("dashboard");
+      window.history.pushState({}, "", "/dashboard");
+      return;
+    }
+
     // CRITICAL: When email verification happens, Supabase broadcasts SIGNED_IN to ALL tabs
     // Only the /auth-callback tab should process the verification.
     // Other tabs (landing, login, register) must NOT auto-redirect when they detect a user FROM EMAIL VERIFICATION.
@@ -194,7 +205,7 @@ function AppInner() {
       // DON'T redirect them. They should stay on their current page.
       // EXCEPTION: If user just logged in from LoginPage (page === "login" and they navigated to dashboard),
       // allow the navigation to proceed.
-      if (isOnAuthOrPublicPage && page !== "login") {
+      if (isOnAuthOrPublicPage && page !== "login" && !loginSuccess) {
         console.log("[App] Ignoring user session on non-callback tab:", window.location.pathname);
         console.log("[App] Keeping tab on current page, not redirecting to dashboard");
         return;
@@ -239,7 +250,16 @@ function AppInner() {
   if (authLoading) return <LoadingScreen />;
 
   if (page === "landing") return <LandingPage onNavigate={go} />;
-  if (page === "login") return <LoginPage onNavigate={go} />;
+  if (page === "login") return (
+    <LoginPage
+      onNavigate={go}
+      onLoginSuccess={() => {
+        console.log("[App] Login success callback triggered");
+        setLoginSuccess(true);
+        go("dashboard");
+      }}
+    />
+  );
   if (page === "register") return <RegisterPage onNavigate={go} />;
   if (page === "verify-email") return <VerifyEmailPage onNavigate={go} />;
   if (page === "forgot-password") return <ForgotPasswordPage onNavigate={go} />;

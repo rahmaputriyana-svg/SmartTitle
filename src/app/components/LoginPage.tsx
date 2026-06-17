@@ -4,9 +4,12 @@ import { useUser } from "../UserContext";
 import { toast } from "sonner";
 import { Field, Layout, S } from "./AuthPages";
 
-interface Props { onNavigate: (p: string) => void }
+interface Props {
+  onNavigate: (p: string) => void;
+  onLoginSuccess?: () => void;
+}
 
-export function LoginPage({ onNavigate }: Props) {
+export function LoginPage({ onNavigate, onLoginSuccess }: Props) {
   const { signIn } = useUser();
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -23,7 +26,13 @@ export function LoginPage({ onNavigate }: Props) {
       setLoading(false);
     } else {
       toast.success("Login berhasil!");
-      onNavigate("dashboard");
+      // Use onLoginSuccess callback to ensure consistent navigation
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      } else {
+        // Fallback to direct navigation if callback not provided
+        onNavigate("dashboard");
+      }
     }
   };
 
