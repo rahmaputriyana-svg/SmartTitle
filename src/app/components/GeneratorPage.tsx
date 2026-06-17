@@ -47,13 +47,39 @@ export function GeneratorPage() {
     if (!field || !topic) return;
     setLoading(true);
     try {
-      const titles = await generateTitles(field, topic, keywords, parseInt(count));
+      const requestedCount = parseInt(count);
+      const titles = await generateTitles(field, topic, keywords, requestedCount);
+      
+      // Validate the number of titles generated
+      if (titles.length < requestedCount) {
+        console.warn(`[Generator] AI generated ${titles.length} titles, but ${requestedCount} were requested`);
+        
+        // Show warning if significantly less (more than 2 titles short)
+        if (titles.length < requestedCount - 2) {
+          toast.warning(
+            `AI hanya menghasilkan ${titles.length} dari ${requestedCount} judul yang diminta. Silakan generate ulang jika tidak puas.`,
+            { duration: 5000 }
+          );
+        } else {
+          // Minor difference, just inform user
+          toast.info(
+            `${titles.length} judul berhasil dibuat (diminta ${requestedCount}).`,
+            { duration: 4000 }
+          );
+        }
+      } else if (titles.length === requestedCount) {
+        // Perfect match
+        toast.success(`${titles.length} judul berhasil dibuat!`);
+      } else {
+        // More than requested (shouldn't happen after validation in gemini.ts)
+        toast.success(`${titles.length} judul berhasil dibuat (diminta ${requestedCount}).`);
+      }
+      
       const id = await addHistoryItem({
         field, topic, keywords, jenisKarya, tingkatPendidikan,
         results: titles.map(t => ({ text: t, saved: false })),
       });
       setHistoryId(id);
-      toast.success(`${titles.length} judul berhasil dibuat!`);
     } catch {
       toast.error("Gagal generate judul. Coba lagi.");
     } finally {

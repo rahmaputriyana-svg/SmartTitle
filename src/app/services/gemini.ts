@@ -81,12 +81,15 @@ export async function generateTitles(
 
   const prompt = `Anda adalah konsultan penelitian akademik Indonesia berpengalaman.
 
-Tugas: Buat ${count} rekomendasi judul skripsi/tesis yang BERBEDA-BEDA, akademis, spesifik, dan berkualitas tinggi.
+Tugas: Buat TEPAT ${count} rekomendasi judul skripsi/tesis yang BERBEDA-BEDA, akademis, spesifik, dan berkualitas tinggi.
+
+PENTING: WAJIB menghasilkan TEPAT ${count} judul. Jangan kurang dan jangan lebih. Jika diminta ${count} judul, maka output harus berisi TEPAT ${count} item.
 
 Parameter:
 - Bidang: ${field}
 - Topik: ${topic}
 - Kata Kunci: ${keywords || "tidak ditentukan"}
+- Jumlah Judul yang DIMINTA: ${count}
 
 Aturan penulisan judul:
 1. Spesifik (sebutkan metode, lokasi, atau objek yang jelas)
@@ -95,8 +98,9 @@ Aturan penulisan judul:
 4. Bahasa Indonesia baku
 5. Tidak menggunakan tanda tanya atau tanda seru
 6. Variasikan metodologi antar judul
+7. JANGAN ada judul yang duplikat atau mirip
 
-Format output: daftar bernomor saja (1. judul, 2. judul, dst.). Tanpa keterangan tambahan.`;
+Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${count}. Tanpa keterangan tambahan di awal atau akhir.`;
 
   try {
     const res = await fetch(
@@ -121,10 +125,32 @@ Format output: daftar bernomor saja (1. judul, 2. judul, dst.). Tanpa keterangan
       .map((l: string) => l.trim())
       .filter((l: string) => /^\d+[\.\)]\s/.test(l))
       .map((l: string) => l.replace(/^\d+[\.\)]\s*/, "").trim())
-      .filter((t: string) => t.length > 10)
-      .slice(0, count);
+      .filter((t: string) => t.length > 10);
 
-    return parsed.length >= 2 ? parsed : getMockTitles(field, count);
+    // Validation: Check if AI generated the exact requested count
+    if (parsed.length < count) {
+      console.warn(`[Gemini] AI generated ${parsed.length} titles, but ${count} were requested`);
+      
+      // If we got less than requested but at least 2, return what we have
+      // GeneratorPage will handle the warning/error display
+      if (parsed.length >= 2) {
+        return parsed;
+      }
+      
+      // If less than 2 titles, fallback to mock
+      console.warn(`[Gemini] Too few titles (${parsed.length}), falling back to mock data`);
+      return getMockTitles(field, count);
+    }
+
+    // If we got more than requested, trim to exact count
+    if (parsed.length > count) {
+      console.log(`[Gemini] AI generated ${parsed.length} titles, trimming to requested ${count}`);
+      return parsed.slice(0, count);
+    }
+
+    // Exact match - perfect!
+    console.log(`[Gemini] Successfully generated exactly ${count} titles as requested`);
+    return parsed;
   } catch {
     return getMockTitles(field, count);
   }
