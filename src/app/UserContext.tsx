@@ -4,6 +4,7 @@ import {
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured, getAuthParamsFromUrl, cleanAuthUrl } from "../lib/supabase";
+import { AUTH_CALLBACK_URL, RESET_PASSWORD_URL } from "../lib/config";
 import { toast } from "sonner";
 
 export interface TitleResult {
@@ -315,7 +316,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         data: { name },
-        emailRedirectTo: `${window.location.origin}/auth-callback`,
+        emailRedirectTo: AUTH_CALLBACK_URL,
       },
     });
     if (error) {
@@ -344,17 +345,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback(async (email: string) => {
     if (!isSupabaseConfigured) return { error: null };
-    const resetUrl = `${window.location.origin}/reset-password`;
-    console.log("[RESET EMAIL] Reset URL:", resetUrl);
-    console.log("[Auth] resetPassword called for:", email, "| redirectTo:", resetUrl);
+    console.log("[RESET EMAIL] Reset URL:", RESET_PASSWORD_URL);
+    console.log("[Auth] resetPassword called for:", email, "| redirectTo:", RESET_PASSWORD_URL);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: resetUrl,
+      redirectTo: RESET_PASSWORD_URL,
     });
     if (error) {
       console.log("[Auth] resetPassword error:", error.message);
     } else {
       console.log("[Auth] resetPassword success — recovery email sent");
-      console.log("[Auth] Email link will redirect to:", resetUrl);
+      console.log("[Auth] Email link will redirect to:", RESET_PASSWORD_URL);
     }
     return { error: error?.message ?? null };
   }, []);
