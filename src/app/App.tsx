@@ -203,9 +203,19 @@ function AppInner() {
     // CRITICAL: Handle successful login - force navigation to dashboard
     if (loginSuccess && user) {
       console.log("RedirectGuard: loginSuccess && user detected, forcing dashboard");
-      setLoginSuccess(false);
+      setLoginSuccess(false);  // Reset flag
       setPage("dashboard");
       window.history.pushState({}, "", "/dashboard");
+      return;
+    }
+
+    // CRITICAL: If login just succeeded but user is still loading, wait
+    if (loginSuccess && page === "dashboard") {
+      console.log("[RedirectGuard] Waiting for login session...");
+      // Reset flag if user eventually loads
+      if (user) {
+        setLoginSuccess(false);
+      }
       return;
     }
 
@@ -241,7 +251,8 @@ function AppInner() {
     }
 
     // Simple guard: if no user and trying to access dashboard, redirect to login
-    if (!user && DASH.includes(page)) {
+    // BUT: Don't redirect if loginSuccess is true (still loading session)
+    if (!user && DASH.includes(page) && !loginSuccess) {
       console.log("RedirectGuard: redirect", page, "-> login (no user)");
       setPage("login");
       return;

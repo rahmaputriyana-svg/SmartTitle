@@ -243,15 +243,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // CRITICAL: Check if this is manual login (not email verification)
+        const isManualLogin = sessionStorage.getItem("manual_login") === "true";
+        
+        if (event === "SIGNED_IN" && isManualLogin && currentUser) {
+          console.log("[Auth] Manual login detected - processing full login flow");
+          console.log("[Auth] User:", currentUser.email);
+          
+          // Clear the manual login flag
+          sessionStorage.removeItem("manual_login");
+          
+          setUser(currentUser);
+          setAuthLoading(false);
+          
+          // Load all user data for manual login
+          await loadProfile(currentUser.id, currentUser.email ?? "");
+          await loadHistory(currentUser.id);
+          await loadFavorites(currentUser.id);
+          
+          console.log("[Auth] Manual login complete - profile/history/favorites loaded");
+          return;
+        }
+
         // CRITICAL: Ignore email verification SIGNED_IN events on NON-callback tabs
         // When user clicks email link in Gmail, Supabase broadcasts SIGNED_IN to ALL tabs
         // Only the /auth-callback tab should process it. Other tabs must ignore it.
+        // BUT: Don't ignore if it's a manual login to /dashboard
         if (event === "SIGNED_IN" && currentUser?.email_confirmed_at) {
           const isAuthCallbackTab = window.location.pathname === "/auth-callback";
           const isPasswordResetTab = window.location.pathname === "/reset-password";
+          const isDashboardTab = window.location.pathname === "/dashboard";
           
-          // If this tab is NOT the auth-callback tab, ignore the verification session
-          if (!isAuthCallbackTab && !isPasswordResetTab) {
+          // If this is dashboard and just logged in, DON'T ignore it
+          if (isDashboardTab && isManualLogin) {
+            console.log("[Auth] Allowing SIGNED_IN on dashboard (manual login)");
+            // Fall through to normal processing
+          } else if (!isAuthCallbackTab && !isPasswordResetTab) {
             console.log("[Auth] Ignoring verification session on non-callback tab:", window.location.pathname);
             console.log("[Auth] This tab should NOT process email verification");
             // DON'T set user - this is not this tab's verification
@@ -331,6 +358,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     console.log("[Auth] signOut: Starting");
+    // Clear manual login flag on sign out
+    sessionStorage.removeItem("manual_login");
+    console.log("[Auth] signOut: Cleared manual_login flag");
     if (isSupabaseConfigured) {
       console.log("[Auth] signOut: Calling supabase.auth.signOut");
       await supabase.auth.signOut();

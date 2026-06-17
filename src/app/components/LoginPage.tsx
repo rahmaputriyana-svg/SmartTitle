@@ -28,6 +28,9 @@ export function LoginPage({ onNavigate, onLoginSuccess }: Props) {
       setLoading(false);
     } else {
       console.log("[LOGIN] success");
+      // Set flag to indicate this is manual login, not email verification
+      sessionStorage.setItem("manual_login", "true");
+      console.log("[LOGIN] Set manual_login flag");
       toast.success("Login berhasil!");
       // Use onLoginSuccess callback to ensure consistent navigation
       if (onLoginSuccess) {
