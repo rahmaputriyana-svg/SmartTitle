@@ -79,6 +79,61 @@ export async function generateTitles(
     return getMockTitles(field, count);
   }
 
+  let allTitles: string[] = [];
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  // First attempt
+  allTitles = await generateTitlesFromAI(field, topic, keywords, count);
+
+  // Retry if we didn't get enough titles
+  while (allTitles.length < count && retryCount < maxRetries) {
+    retryCount++;
+    const remaining = count - allTitles.length;
+    
+    console.log(`[Gemini] Retry ${retryCount}/${maxRetries}: Need ${remaining} more titles (have ${allTitles.length}, need ${count})`);
+    
+    // Generate remaining titles with context of existing ones
+    const additionalTitles = await generateAdditionalTitles(
+      field, topic, keywords, remaining, allTitles
+    );
+    
+    // Merge new titles (avoid duplicates)
+    const newUniqueTitles = additionalTitles.filter(
+      t => !allTitles.includes(t)
+    );
+    
+    allTitles = [...allTitles, ...newUniqueTitles];
+    
+    console.log(`[Gemini] After retry ${retryCount}: ${allTitles.length}/${count} titles`);
+    
+    // If we got enough, break early
+    if (allTitles.length >= count) {
+      break;
+    }
+  }
+
+  // Final validation
+  if (allTitles.length >= count) {
+    // Trim if we got more than requested
+    console.log(`[Gemini] Success! Generated ${allTitles.length} titles, trimming to ${count}`);
+    return allTitles.slice(0, count);
+  }
+  
+  // If still not enough after retries, return what we have
+  console.warn(`[Gemini] After ${maxRetries} retries, only ${allTitles.length}/${count} titles generated`);
+  return allTitles;
+}
+
+// Helper function for initial generation
+async function generateTitlesFromAI(
+  field: string,
+  topic: string,
+  keywords: string,
+  count: number
+): Promise<string[]> {
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
+
   const prompt = `Anda adalah konsultan penelitian akademik Indonesia berpengalaman.
 
 Tugas: Buat TEPAT ${count} rekomendasi judul skripsi/tesis yang BERBEDA-BEDA, akademis, spesifik, dan berkualitas tinggi.
@@ -120,38 +175,87 @@ Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 samp
     const data = await res.json();
     const raw: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    const parsed = raw
-      .split("\n")
-      .map((l: string) => l.trim())
-      .filter((l: string) => /^\d+[\.\)]\s/.test(l))
-      .map((l: string) => l.replace(/^\d+[\.\)]\s*/, "").trim())
-      .filter((t: string) => t.length > 10);
-
-    // Validation: Check if AI generated the exact requested count
-    if (parsed.length < count) {
-      console.warn(`[Gemini] AI generated ${parsed.length} titles, but ${count} were requested`);
-      
-      // If we got less than requested but at least 2, return what we have
-      // GeneratorPage will handle the warning/error display
-      if (parsed.length >= 2) {
-        return parsed;
-      }
-      
-      // If less than 2 titles, fallback to mock
-      console.warn(`[Gemini] Too few titles (${parsed.length}), falling back to mock data`);
-      return getMockTitles(field, count);
-    }
-
-    // If we got more than requested, trim to exact count
-    if (parsed.length > count) {
-      console.log(`[Gemini] AI generated ${parsed.length} titles, trimming to requested ${count}`);
-      return parsed.slice(0, count);
-    }
-
-    // Exact match - perfect!
-    console.log(`[Gemini] Successfully generated exactly ${count} titles as requested`);
-    return parsed;
+    return parseTitles(raw, count);
   } catch {
     return getMockTitles(field, count);
   }
+}
+
+// Helper function for generating additional titles (retry)
+async function generateAdditionalTitles(
+  field: string,
+  topic: string,
+  keywords: string,
+  remaining: number,
+  existingTitles: string[]
+): Promise<string[]> {
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
+
+  // Format existing titles for context
+  const existingList = existingTitles
+    .map((t, i) => `${i + 1}. ${t}`)
+    .join("\n");
+
+  const prompt = `Anda adalah konsultan penelitian akademik Indonesia berpengalaman.
+
+Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang BERBEDA SAMA SEKALI dari judul yang sudah ada.
+
+PENTING:
+1. WAJIB menghasilkan TEPAT ${remaining} judul baru
+2. JANGAN mengulang judul yang sudah ada di bawah ini
+3. Setiap judul harus unik dan tidak mirip dengan yang sudah ada
+
+Judul yang SUDAH ADA (JANGAN ULANG):
+${existingList}
+
+Parameter:
+- Bidang: ${field}
+- Topik: ${topic}
+- Kata Kunci: ${keywords || "tidak ditentukan"}
+- Jumlah Judul Baru yang DIMINTA: ${remaining}
+
+Aturan penulisan judul:
+1. Spesifik (sebutkan metode, lokasi, atau objek yang jelas)
+2. Menggunakan kata kerja ilmiah yang berbeda dari judul existing
+3. Panjang 10-20 kata
+4. Bahasa Indonesia baku
+5. Variasikan metodologi
+
+Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${remaining}. Tanpa keterangan tambahan.`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 1024 }, // Higher temp for variety
+        }),
+      }
+    );
+
+    if (!res.ok) throw new Error(`Gemini ${res.status}`);
+
+    const data = await res.json();
+    const raw: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    return parseTitles(raw, remaining);
+  } catch {
+    console.warn(`[Gemini] Retry generation failed, falling back to mock`);
+    return getMockTitles(field, remaining);
+  }
+}
+
+// Helper function to parse titles from AI response
+function parseTitles(raw: string, count: number): string[] {
+  const parsed = raw
+    .split("\n")
+    .map((l: string) => l.trim())
+    .filter((l: string) => /^\d+[\.\)]\s/.test(l))
+    .map((l: string) => l.replace(/^\d+[\.\)]\s*/, "").trim())
+    .filter((t: string) => t.length > 10);
+
+  return parsed;
 }

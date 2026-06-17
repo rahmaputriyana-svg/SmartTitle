@@ -52,21 +52,13 @@ export function GeneratorPage() {
       
       // Validate the number of titles generated
       if (titles.length < requestedCount) {
-        console.warn(`[Generator] AI generated ${titles.length} titles, but ${requestedCount} were requested`);
+        // Still less after retries - show warning
+        console.warn(`[Generator] After all retries, AI generated ${titles.length} titles, but ${requestedCount} were requested`);
         
-        // Show warning if significantly less (more than 2 titles short)
-        if (titles.length < requestedCount - 2) {
-          toast.warning(
-            `AI hanya menghasilkan ${titles.length} dari ${requestedCount} judul yang diminta. Silakan generate ulang jika tidak puas.`,
-            { duration: 5000 }
-          );
-        } else {
-          // Minor difference, just inform user
-          toast.info(
-            `${titles.length} judul berhasil dibuat (diminta ${requestedCount}).`,
-            { duration: 4000 }
-          );
-        }
+        toast.warning(
+          `AI hanya menghasilkan ${titles.length} dari ${requestedCount} judul yang diminta. Silakan generate ulang jika tidak puas.`,
+          { duration: 5000 }
+        );
       } else if (titles.length === requestedCount) {
         // Perfect match
         toast.success(`${titles.length} judul berhasil dibuat!`);
