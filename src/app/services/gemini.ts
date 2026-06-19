@@ -70,7 +70,9 @@ export async function generateTitles(
   field: string,
   topic: string,
   keywords: string,
-  count: number
+  count: number,
+  jenisKarya?: string,
+  tingkatPendidikan?: string
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
@@ -84,28 +86,47 @@ export async function generateTitles(
   const maxRetries = 3;
 
   // First attempt
-  allTitles = await generateTitlesFromAI(field, topic, keywords, count);
+  allTitles = await generateTitlesFromAI(field, topic, keywords, count, jenisKarya, tingkatPendidikan);
 
-  // Retry if we didn't get enough titles
+  // Validate relevance and filter out irrelevant titles
+  const relevantTitles = allTitles.filter(title => 
+    isTitleRelevant(title, field, topic, keywords)
+  );
+  
+  // Log filtered titles
+  const filteredCount = allTitles.length - relevantTitles.length;
+  if (filteredCount > 0) {
+    console.warn(`[Gemini] Filtered out ${filteredCount} irrelevant titles, keeping ${relevantTitles.length}`);
+  }
+  
+  allTitles = relevantTitles;
+
+  // Retry if we didn't get enough RELEVANT titles
   while (allTitles.length < count && retryCount < maxRetries) {
     retryCount++;
     const remaining = count - allTitles.length;
     
-    console.log(`[Gemini] Retry ${retryCount}/${maxRetries}: Need ${remaining} more titles (have ${allTitles.length}, need ${count})`);
+    console.log(`[Gemini] Retry ${retryCount}/${maxRetries}: Need ${remaining} more RELEVANT titles (have ${allTitles.length}, need ${count})`);
     
     // Generate remaining titles with context of existing ones
     const additionalTitles = await generateAdditionalTitles(
-      field, topic, keywords, remaining, allTitles
+      field, topic, keywords, remaining, allTitles, jenisKarya, tingkatPendidikan
     );
     
-    // Merge new titles (avoid duplicates)
-    const newUniqueTitles = additionalTitles.filter(
-      t => !allTitles.includes(t)
+    // Validate relevance of new titles
+    const relevantNewTitles = additionalTitles.filter(title => 
+      isTitleRelevant(title, field, topic, keywords) && !allTitles.includes(title)
     );
     
-    allTitles = [...allTitles, ...newUniqueTitles];
+    const newFilteredCount = additionalTitles.length - relevantNewTitles.length;
+    if (newFilteredCount > 0) {
+      console.warn(`[Gemini] Retry ${retryCount}: Filtered out ${newFilteredCount} irrelevant titles`);
+    }
     
-    console.log(`[Gemini] After retry ${retryCount}: ${allTitles.length}/${count} titles`);
+    // Merge new relevant titles (avoid duplicates)
+    allTitles = [...allTitles, ...relevantNewTitles];
+    
+    console.log(`[Gemini] After retry ${retryCount}: ${allTitles.length}/${count} RELEVANT titles`);
     
     // If we got enough, break early
     if (allTitles.length >= count) {
@@ -116,12 +137,12 @@ export async function generateTitles(
   // Final validation
   if (allTitles.length >= count) {
     // Trim if we got more than requested
-    console.log(`[Gemini] Success! Generated ${allTitles.length} titles, trimming to ${count}`);
+    console.log(`[Gemini] Success! Generated ${allTitles.length} RELEVANT titles, trimming to ${count}`);
     return allTitles.slice(0, count);
   }
   
   // If still not enough after retries, return what we have
-  console.warn(`[Gemini] After ${maxRetries} retries, only ${allTitles.length}/${count} titles generated`);
+  console.warn(`[Gemini] After ${maxRetries} retries, only ${allTitles.length}/${count} RELEVANT titles generated`);
   return allTitles;
 }
 
@@ -130,30 +151,63 @@ async function generateTitlesFromAI(
   field: string,
   topic: string,
   keywords: string,
-  count: number
+  count: number,
+  jenisKarya?: string,
+  tingkatPendidikan?: string
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
-  const prompt = `Anda adalah konsultan penelitian akademik Indonesia berpengalaman.
+  const prompt = `Kamu adalah dosen pembimbing skripsi dan pakar penelitian.
 
-Tugas: Buat TEPAT ${count} rekomendasi judul skripsi/tesis yang BERBEDA-BEDA, akademis, spesifik, dan berkualitas tinggi.
+Tugasmu adalah membuat rekomendasi judul penelitian.
 
-PENTING: WAJIB menghasilkan TEPAT ${count} judul. Jangan kurang dan jangan lebih. Jika diminta ${count} judul, maka output harus berisi TEPAT ${count} item.
+WAJIB mengikuti seluruh parameter berikut.
 
-Parameter:
-- Bidang: ${field}
-- Topik: ${topic}
-- Kata Kunci: ${keywords || "tidak ditentukan"}
-- Jumlah Judul yang DIMINTA: ${count}
+Bidang Penelitian:
+${field}
 
-Aturan penulisan judul:
-1. Spesifik (sebutkan metode, lokasi, atau objek yang jelas)
-2. Menggunakan kata kerja ilmiah (Analisis, Pengembangan, Implementasi, Evaluasi, Perancangan, dll.)
-3. Panjang 10-20 kata
-4. Bahasa Indonesia baku
-5. Tidak menggunakan tanda tanya atau tanda seru
-6. Variasikan metodologi antar judul
-7. JANGAN ada judul yang duplikat atau mirip
+Topik Penelitian:
+${topic}
+
+Kata Kunci:
+${keywords || "tidak ada kata kunci spesifik"}
+
+${jenisKarya ? `Jenis Karya:\n${jenisKarya}\n\n` : ""}${tingkatPendidikan ? `Tingkat Pendidikan:\n${tingkatPendidikan}\n\n` : ""}Jumlah Judul:
+${count}
+
+ATURAN:
+
+1. Semua judul HARUS berada pada bidang ${field}.
+
+2. Semua judul HARUS membahas topik ${topic}.
+
+3. Semua judul HARUS menggunakan atau mencerminkan kata kunci: ${keywords || "topik terkait"}
+
+4. Jangan membuat judul di luar topik ${topic}.
+
+5. Jangan menggunakan bidang ilmu lain selain ${field}.
+
+6. Jangan menghasilkan judul yang terlalu umum.
+
+7. Judul harus realistis untuk skripsi Indonesia.
+
+8. Hindari judul yang sama atau sangat mirip.
+
+9. Gunakan bahasa akademik.
+
+10. Berikan tepat ${count} judul.
+
+11. Spesifik (sebutkan metode, lokasi, atau objek yang jelas).
+
+12. Menggunakan kata kerja ilmiah (Analisis, Pengembangan, Implementasi, Evaluasi, Perancangan, dll.).
+
+13. Panjang 10-20 kata.
+
+14. Bahasa Indonesia baku.
+
+15. Tidak menggunakan tanda tanya atau tanda seru.
+
+PENTING: WAJIB menghasilkan TEPAT ${count} judul. Jangan kurang dan jangan lebih.
 
 Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${count}. Tanpa keterangan tambahan di awal atau akhir.`;
 
@@ -187,7 +241,9 @@ async function generateAdditionalTitles(
   topic: string,
   keywords: string,
   remaining: number,
-  existingTitles: string[]
+  existingTitles: string[],
+  jenisKarya?: string,
+  tingkatPendidikan?: string
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
@@ -196,30 +252,62 @@ async function generateAdditionalTitles(
     .map((t, i) => `${i + 1}. ${t}`)
     .join("\n");
 
-  const prompt = `Anda adalah konsultan penelitian akademik Indonesia berpengalaman.
+  const prompt = `Kamu adalah dosen pembimbing skripsi dan pakar penelitian.
 
 Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang BERBEDA SAMA SEKALI dari judul yang sudah ada.
 
-PENTING:
-1. WAJIB menghasilkan TEPAT ${remaining} judul baru
-2. JANGAN mengulang judul yang sudah ada di bawah ini
-3. Setiap judul harus unik dan tidak mirip dengan yang sudah ada
+WAJIB mengikuti seluruh parameter berikut.
+
+Bidang Penelitian:
+${field}
+
+Topik Penelitian:
+${topic}
+
+Kata Kunci:
+${keywords || "tidak ada kata kunci spesifik"}
+
+${jenisKarya ? `Jenis Karya:\n${jenisKarya}\n\n` : ""}${tingkatPendidikan ? `Tingkat Pendidikan:\n${tingkatPendidikan}\n\n` : ""}Jumlah Judul Baru:
+${remaining}
 
 Judul yang SUDAH ADA (JANGAN ULANG):
 ${existingList}
 
-Parameter:
-- Bidang: ${field}
-- Topik: ${topic}
-- Kata Kunci: ${keywords || "tidak ditentukan"}
-- Jumlah Judul Baru yang DIMINTA: ${remaining}
+ATURAN:
 
-Aturan penulisan judul:
-1. Spesifik (sebutkan metode, lokasi, atau objek yang jelas)
-2. Menggunakan kata kerja ilmiah yang berbeda dari judul existing
-3. Panjang 10-20 kata
-4. Bahasa Indonesia baku
-5. Variasikan metodologi
+1. Semua judul HARUS berada pada bidang ${field}.
+
+2. Semua judul HARUS membahas topik ${topic}.
+
+3. Semua judul HARUS menggunakan atau mencerminkan kata kunci: ${keywords || "topik terkait"}
+
+4. Jangan membuat judul di luar topik ${topic}.
+
+5. Jangan menggunakan bidang ilmu lain selain ${field}.
+
+6. JANGAN mengulang judul yang sudah ada di atas.
+
+7. Setiap judul harus unik dan tidak mirip dengan yang sudah ada.
+
+8. Judul harus realistis untuk skripsi Indonesia.
+
+9. Gunakan bahasa akademik.
+
+10. Berikan tepat ${remaining} judul baru.
+
+11. Spesifik (sebutkan metode, lokasi, atau objek yang jelas).
+
+12. Menggunakan kata kerja ilmiah yang berbeda dari judul existing.
+
+13. Panjang 10-20 kata.
+
+14. Bahasa Indonesia baku.
+
+PENTING:
+1. WAJIB menghasilkan TEPAT ${remaining} judul baru
+2. JANGAN mengulang judul yang sudah ada
+3. Setiap judul harus unik dan tidak mirip dengan yang sudah ada
+4. HARUS sesuai dengan bidang, topik, dan kata kunci
 
 Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${remaining}. Tanpa keterangan tambahan.`;
 
@@ -231,7 +319,7 @@ Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 samp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 1024 }, // Higher temp for variety
+          generationConfig: { temperature: 0.9, maxOutputTokens: 1024 },
         }),
       }
     );
@@ -258,4 +346,46 @@ function parseTitles(raw: string, count: number): string[] {
     .filter((t: string) => t.length > 10);
 
   return parsed;
+}
+
+// Relevance validation function
+function isTitleRelevant(
+  title: string,
+  field: string,
+  topic: string,
+  keywords: string
+): boolean {
+  const titleLower = title.toLowerCase();
+  const fieldLower = field.toLowerCase();
+  const topicLower = topic.toLowerCase();
+  const keywordsLower = keywords.toLowerCase();
+  
+  // Extract key terms from field, topic, and keywords
+  const fieldTerms = fieldLower.split(/\s+/).filter(term => term.length > 3);
+  const topicTerms = topicLower.split(/\s+/).filter(term => term.length > 3);
+  const keywordTerms = keywordsLower.split(/[,\s]+/).filter(term => term.length > 3);
+  
+  // Check if title contains topic terms (most important)
+  const hasTopicRelevance = topicTerms.some(term => titleLower.includes(term));
+  
+  // Check if title contains keyword terms (if keywords provided)
+  const hasKeywordRelevance = keywords 
+    ? keywordTerms.some(term => titleLower.includes(term))
+    : true; // If no keywords, this check passes
+  
+  // Check if title contains field terms
+  const hasFieldRelevance = fieldTerms.some(term => titleLower.includes(term));
+  
+  // Title must have at least topic OR field relevance
+  const isRelevant = hasTopicRelevance || hasFieldRelevance;
+  
+  // Log validation details for debugging
+  if (!isRelevant) {
+    console.warn(`[Validation] Title rejected: "${title}"`);
+    console.warn(`  - Topic terms: ${topicTerms.join(", ")}`);
+    console.warn(`  - Keyword terms: ${keywordTerms.join(", ")}`);
+    console.warn(`  - Field terms: ${fieldTerms.join(", ")}`);
+  }
+  
+  return isRelevant;
 }

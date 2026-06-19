@@ -48,7 +48,7 @@ export function GeneratorPage() {
     setLoading(true);
     try {
       const requestedCount = parseInt(count);
-      const titles = await generateTitles(field, topic, keywords, requestedCount);
+      const titles = await generateTitles(field, topic, keywords, requestedCount, jenisKarya, tingkatPendidikan);
       
       // Validate the number of titles generated
       if (titles.length < requestedCount) {
