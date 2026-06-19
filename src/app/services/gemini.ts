@@ -187,18 +187,82 @@ async function generateTitlesFromAI(
     ? `\n\n⛔ DAFTAR JUDUL YANG DILARANG (JANGAN ULANGI SAMA SEKALI):\n${previousTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n❗ PENTING: Jangan menghasilkan judul yang sama atau mirip dengan daftar di atas. Buat yang BENAR-BENAR BARU dan BERBEDA.`
     : '';
 
-  const prompt = `Kamu adalah dosen pembimbing skripsi senior dan reviewer jurnal ilmiah.
+  const prompt = `Anda adalah dosen pembimbing skripsi, reviewer jurnal internasional, editor Scopus, dan peneliti senior yang telah membimbing ribuan penelitian.
 
-Tugasmu adalah membuat rekomendasi judul penelitian yang KREATIF, UNIK, SPESIFIK, dan BERKUALITAS TINGGI.
+Tugas Anda adalah menghasilkan judul penelitian akademik yang berkualitas tinggi.
 
 🎲 Generation ID: ${generationId}
-(Gunakan seed ini untuk menghasilkan variasi yang berbeda setiap kali)
+(Setiap generation ID menghasilkan variasi yang berbeda)
 ${previousTitlesSection}
 
-WAJIB mengikuti seluruh parameter berikut.
+Setiap judul HARUS:
+
+1. Sangat relevan dengan bidang penelitian: ${field}
+2. Sangat relevan dengan topik penelitian: ${topic}
+3. Memanfaatkan seluruh kata kunci secara alami: ${keywords || "topik terkait"}
+4. Sesuai dengan jenis karya: ${jenisKarya || "Skripsi"}
+5. Disesuaikan dengan tingkat pendidikan: ${tingkatPendidikan || "S1"}
+6. Menggunakan istilah akademik yang modern
+7. Menampilkan unsur kebaruan (novelty)
+8. Layak diajukan sebagai judul penelitian
+9. Tidak terlalu pendek (minimal 10 kata)
+10. Tidak terlalu panjang (maksimal 20 kata)
+11. Tidak menggunakan kalimat yang sama berulang
+12. Tidak menghasilkan judul generik
+13. Tidak menggunakan template yang identik
+14. Tidak membuat judul yang hanya mengganti satu atau dua kata
+
+UTAMAKAN VARIASI.
+
+Gunakan berbagai pendekatan seperti:
+- Perancangan, Pengembangan, Implementasi
+- Analisis, Evaluasi, Optimasi
+- Prediksi, Klasifikasi, Deteksi
+- Monitoring, Rekomendasi
+- Decision Support System
+- Deep Learning, Machine Learning, Artificial Intelligence
+- Computer Vision, NLP, Data Mining
+- Blockchain, IoT, Big Data, Cloud Computing
+- Cyber Security, Digital Twin
+- Explainable AI, Federated Learning
+- Multi-Agent AI, RAG, LLM
+- Generative AI, Hybrid Model, Smart System
+
+Jika diminta beberapa judul sekaligus, setiap judul WAJIB berbeda konsep.
+
+Contoh variasi konsep:
+- Judul 1: menggunakan metode klasifikasi
+- Judul 2: menggunakan optimasi
+- Judul 3: menggunakan prediksi
+- Judul 4: menggunakan evaluasi
+- Judul 5: menggunakan pengembangan sistem
+- Judul 6: menggunakan analisis komparatif
+- Judul 7: menggunakan Decision Support System
+- Judul 8: menggunakan model hybrid
+
+Jangan membuat judul yang hanya berbeda satu kata.
+
+Setiap judul harus memiliki sudut pandang penelitian yang berbeda.
+
+Gunakan nama metode penelitian yang memang umum dipakai dalam bidang ${field}.
+
+HINDARI JUDUL TERLALU UMUM SEPERTI:
+❌ "Analisis Sistem Informasi Penjualan"
+❌ "Perancangan Sistem Berbasis Web"
+❌ "Implementasi Machine Learning untuk Bisnis"
+
+HASILKAN JUDUL YANG MENARIK SEPERTI:
+✅ "Optimasi Deteksi Fraud Transaksi Digital Menggunakan Hybrid XGBoost dan Explainable Artificial Intelligence"
+✅ "Pengembangan Sistem Rekomendasi Karier Mahasiswa Berbasis Large Language Model dan Semantic Matching"
+✅ "Model Prediksi Tingkat Kelulusan Mahasiswa Menggunakan Explainable Machine Learning Berbasis Data Akademik"
+
+PARAMETER PENELITIAN:
 
 Bidang Penelitian:
 ${field}
+
+Jenis Karya:
+${jenisKarya || "Skripsi"}
 
 Topik Penelitian:
 ${topic}
@@ -206,44 +270,27 @@ ${topic}
 Kata Kunci:
 ${keywords || "tidak ada kata kunci spesifik"}
 
-${jenisKarya ? `Jenis Karya:\n${jenisKarya}\n\n` : ""}${tingkatPendidikan ? `Tingkat Pendidikan:\n${tingkatPendidikan}\n\n` : ""}Jumlah Judul:
+Tingkat Pendidikan:
+${tingkatPendidikan || "S1"}
+
+Jumlah Judul:
 ${count}
 
-ATURAN:
+INSTRUKSI FINAL:
 
-1. Semua judul HARUS berada pada bidang ${field}.
+Buat TEPAT ${count} judul penelitian.
 
-2. Semua judul HARUS membahas topik ${topic}.
+Setiap judul harus unik dan menggunakan pendekatan penelitian yang berbeda.
 
-3. Semua judul HARUS menggunakan atau mencerminkan kata kunci: ${keywords || "topik terkait"}
+Setiap judul harus benar-benar sesuai dengan seluruh parameter di atas.
 
-4. Jangan membuat judul di luar topik ${topic}.
+Kembalikan HANYA daftar judul tanpa penjelasan, tanpa markdown, tanpa nomor tambahan selain penomoran daftar.
 
-5. Jangan menggunakan bidang ilmu lain selain ${field}.
-
-6. Jangan menghasilkan judul yang terlalu umum.
-
-7. Judul harus realistis untuk skripsi Indonesia.
-
-8. Hindari judul yang sama atau sangat mirip.
-
-9. Gunakan bahasa akademik.
-
-10. Berikan tepat ${count} judul.
-
-11. Spesifik (sebutkan metode, lokasi, atau objek yang jelas).
-
-12. Menggunakan kata kerja ilmiah (Analisis, Pengembangan, Implementasi, Evaluasi, Perancangan, dll.).
-
-13. Panjang 10-20 kata.
-
-14. Bahasa Indonesia baku.
-
-15. Tidak menggunakan tanda tanya atau tanda seru.
-
-PENTING: WAJIB menghasilkan TEPAT ${count} judul. Jangan kurang dan jangan lebih.
-
-Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${count}. Tanpa keterangan tambahan di awal atau akhir.`;
+Format: 
+1. [judul pertama]
+2. [judul kedua]
+3. [judul ketiga]
+...dst sampai ${count}`;
 
   try {
     const res = await fetch(
@@ -288,64 +335,67 @@ async function generateAdditionalTitles(
     .map((t, i) => `${i + 1}. ${t}`)
     .join("\n");
 
-  const prompt = `Kamu adalah dosen pembimbing skripsi senior dan reviewer jurnal ilmiah.
+  const prompt = `Anda adalah dosen pembimbing skripsi senior, reviewer jurnal internasional, dan peneliti berpengalaman.
 
-Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang KREATIF, UNIK, dan BERBEDA SAMA SEKALI dari judul yang sudah ada.
+Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang benar-benar BARU, KREATIF, dan BERBEDA SAMA SEKALI dari semua judul yang sudah ada.
 
-WAJIB mengikuti seluruh parameter berikut.
-
-Bidang Penelitian:
-${field}
-
-Topik Penelitian:
-${topic}
-
-Kata Kunci:
-${keywords || "tidak ada kata kunci spesifik"}
-
-${jenisKarya ? `Jenis Karya:\n${jenisKarya}\n\n` : ""}${tingkatPendidikan ? `Tingkat Pendidikan:\n${tingkatPendidikan}\n\n` : ""}Jumlah Judul Baru:
-${remaining}
-
-Judul yang SUDAH ADA (JANGAN ULANG):
+⛔ DAFTAR JUDUL YANG SUDAH ADA (DILARANG MENGULANG ATAU MIRIP):
 ${existingList}
 
-ATURAN:
+Setiap judul baru HARUS:
 
-1. Semua judul HARUS berada pada bidang ${field}.
+1. Sangat relevan dengan bidang: ${field}
+2. Sangat relevan dengan topik: ${topic}
+3. Memanfaatkan kata kunci: ${keywords || "topik terkait"}
+4. Sesuai jenis karya: ${jenisKarya || "Skripsi"}
+5. Sesuai tingkat pendidikan: ${tingkatPendidikan || "S1"}
+6. Menggunakan pendekatan/metode yang BERBEDA dari semua judul di atas
+7. Memiliki sudut pandang penelitian yang berbeda
+8. Menampilkan kebaruan (novelty)
+9. Tidak mengulang atau memparaphrase judul yang sudah ada
+10. Layak sebagai penelitian akademik
 
-2. Semua judul HARUS membahas topik ${topic}.
+UTAMAKAN VARIASI METODE:
 
-3. Semua judul HARUS menggunakan atau mencerminkan kata kunci: ${keywords || "topik terkait"}
+Gunakan pendekatan yang berbeda-beda untuk setiap judul:
+- Jika judul existing pakai "Analisis", buat yang "Optimasi" atau "Prediksi"
+- Jika existing pakai "Machine Learning", buat yang "Deep Learning" atau "Hybrid Model"
+- Jika existing pakai "Sistem Informasi", buat yang "Decision Support System"
+- Variasikan: klasifikasi, clustering, forecasting, detection, recommendation, dll.
 
-4. Jangan membuat judul di luar topik ${topic}.
+CONTOH VARIASI YANG BAIK:
+✅ Existing: "Analisis Sentimen Menggunakan Naive Bayes"
+  → Baru: "Optimasi Akurasi Klasifikasi Sentimen Menggunakan Hybrid CNN-LSTM"
 
-5. Jangan menggunakan bidang ilmu lain selain ${field}.
+✅ Existing: "Sistem Rekomendasi Berbasis Collaborative Filtering"
+  → Baru: "Pengembangan Smart Recommendation System Menggunakan Knowledge Graph dan Semantic Matching"
 
-6. JANGAN mengulang judul yang sudah ada di atas.
+HINDARI:
+❌ Judul yang hanya mengganti 1-2 kata dari yang sudah ada
+❌ Judul dengan struktur yang sama persis
+❌ Judul dengan metode yang sama hanya beda objek
+❌ Judul generik seperti "Analisis Sistem..." atau "Perancangan Sistem..."
 
-7. Setiap judul harus unik dan tidak mirip dengan yang sudah ada.
+PARAMETER:
+- Bidang: ${field}
+- Topik: ${topic}
+- Kata Kunci: ${keywords || "tidak ada"}
+- Jenis Karya: ${jenisKarya || "Skripsi"}
+- Tingkat: ${tingkatPendidikan || "S1"}
+- Jumlah yang Dibutuhkan: ${remaining}
 
-8. Judul harus realistis untuk skripsi Indonesia.
+INSTRUKSI FINAL:
 
-9. Gunakan bahasa akademik.
+Buat TEPAT ${remaining} judul yang benar-benar BARU dan BERBEDA dari semua judul di atas.
 
-10. Berikan tepat ${remaining} judul baru.
+Setiap judul harus menggunakan metode/pendekatan yang berbeda.
 
-11. Spesifik (sebutkan metode, lokasi, atau objek yang jelas).
+Kembalikan HANYA daftar judul tanpa penjelasan.
 
-12. Menggunakan kata kerja ilmiah yang berbeda dari judul existing.
-
-13. Panjang 10-20 kata.
-
-14. Bahasa Indonesia baku.
-
-PENTING:
-1. WAJIB menghasilkan TEPAT ${remaining} judul baru
-2. JANGAN mengulang judul yang sudah ada
-3. Setiap judul harus unik dan tidak mirip dengan yang sudah ada
-4. HARUS sesuai dengan bidang, topik, dan kata kunci
-
-Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 sampai ${remaining}. Tanpa keterangan tambahan.`;
+Format:
+1. [judul baru pertama]
+2. [judul baru kedua]
+...dst sampai ${remaining}`;
 
   try {
     const res = await fetch(
