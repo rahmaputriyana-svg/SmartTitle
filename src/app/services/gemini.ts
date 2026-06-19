@@ -90,17 +90,27 @@ export async function generateTitles(
   allTitles = await generateTitlesFromAI(field, topic, keywords, count, jenisKarya, tingkatPendidikan, previousTitles);
 
   // Validate relevance and filter out irrelevant titles
-  const relevantTitles = allTitles.filter(title => 
+  let relevantTitles = allTitles.filter(title => 
     isTitleRelevant(title, field, topic, keywords)
   );
   
+  // Filter out duplicates from previous generations
+  const nonDuplicateTitles = relevantTitles.filter(title => 
+    !isTitleDuplicate(title, previousTitles || [])
+  );
+  
   // Log filtered titles
-  const filteredCount = allTitles.length - relevantTitles.length;
-  if (filteredCount > 0) {
-    console.warn(`[Gemini] Filtered out ${filteredCount} irrelevant titles, keeping ${relevantTitles.length}`);
+  const filteredRelevance = allTitles.length - relevantTitles.length;
+  const filteredDuplicates = relevantTitles.length - nonDuplicateTitles.length;
+  
+  if (filteredRelevance > 0) {
+    console.warn(`[Gemini] Filtered out ${filteredRelevance} irrelevant titles`);
+  }
+  if (filteredDuplicates > 0) {
+    console.warn(`[Gemini] Filtered out ${filteredDuplicates} duplicate/similar titles from previous generations`);
   }
   
-  allTitles = relevantTitles;
+  allTitles = nonDuplicateTitles;
 
   // Retry if we didn't get enough RELEVANT titles
   while (allTitles.length < count && retryCount < maxRetries) {
@@ -116,16 +126,26 @@ export async function generateTitles(
     
     // Validate relevance of new titles
     const relevantNewTitles = additionalTitles.filter(title => 
-      isTitleRelevant(title, field, topic, keywords) && !allTitles.includes(title)
+      isTitleRelevant(title, field, topic, keywords)
     );
     
-    const newFilteredCount = additionalTitles.length - relevantNewTitles.length;
-    if (newFilteredCount > 0) {
-      console.warn(`[Gemini] Retry ${retryCount}: Filtered out ${newFilteredCount} irrelevant titles`);
+    // Filter duplicates against BOTH current batch AND previous generations
+    const uniqueNewTitles = relevantNewTitles.filter(title => 
+      !isTitleDuplicate(title, [...allTitles, ...(previousTitles || [])])
+    );
+    
+    const newFilteredRelevance = additionalTitles.length - relevantNewTitles.length;
+    const newFilteredDuplicates = relevantNewTitles.length - uniqueNewTitles.length;
+    
+    if (newFilteredRelevance > 0) {
+      console.warn(`[Gemini] Retry ${retryCount}: Filtered out ${newFilteredRelevance} irrelevant titles`);
+    }
+    if (newFilteredDuplicates > 0) {
+      console.warn(`[Gemini] Retry ${retryCount}: Filtered out ${newFilteredDuplicates} duplicate titles`);
     }
     
     // Merge new relevant titles (avoid duplicates)
-    allTitles = [...allTitles, ...relevantNewTitles];
+    allTitles = [...allTitles, ...uniqueNewTitles];
     
     console.log(`[Gemini] After retry ${retryCount}: ${allTitles.length}/${count} RELEVANT titles`);
     
@@ -159,14 +179,21 @@ async function generateTitlesFromAI(
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
+  // Generate unique ID for this generation to force variation
+  const generationId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
   // Format previous titles to avoid repetition
   const previousTitlesSection = previousTitles && previousTitles.length > 0
-    ? `\n\nJudul yang SUDAH PERNAH DIBUAT SEBELUMNYA (JANGAN ULANGI ATAU MIRIP):\n${previousTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nBuat judul yang BENAR-BENAR BERBEDA dari daftar di atas.`
+    ? `\n\n⛔ DAFTAR JUDUL YANG DILARANG (JANGAN ULANGI SAMA SEKALI):\n${previousTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n❗ PENTING: Jangan menghasilkan judul yang sama atau mirip dengan daftar di atas. Buat yang BENAR-BENAR BARU dan BERBEDA.`
     : '';
 
   const prompt = `Kamu adalah dosen pembimbing skripsi senior dan reviewer jurnal ilmiah.
 
-Tugasmu adalah membuat rekomendasi judul penelitian yang KREATIF, UNIK, SPESIFIK, dan BERKUALITAS TINGGI.${previousTitlesSection}
+Tugasmu adalah membuat rekomendasi judul penelitian yang KREATIF, UNIK, SPESIFIK, dan BERKUALITAS TINGGI.
+
+🎲 Generation ID: ${generationId}
+(Gunakan seed ini untuk menghasilkan variasi yang berbeda setiap kali)
+${previousTitlesSection}
 
 WAJIB mengikuti seluruh parameter berikut.
 
@@ -397,4 +424,39 @@ function isTitleRelevant(
   }
   
   return isRelevant;
+}
+
+// Check if title is too similar to any existing title
+function isTitleDuplicate(
+  title: string,
+  existingTitles: string[]
+): boolean {
+  const titleLower = title.toLowerCase();
+  const titleWords = new Set(titleLower.split(/\s+/).filter(w => w.length > 3));
+  
+  for (const existing of existingTitles) {
+    const existingLower = existing.toLowerCase();
+    
+    // Exact match
+    if (titleLower === existingLower) {
+      console.warn(`[Duplicate] EXACT match: "${title}"`);
+      return true;
+    }
+    
+    // Check similarity using word overlap
+    const existingWords = new Set(existingLower.split(/\s+/).filter(w => w.length > 3));
+    const commonWords = [...titleWords].filter(w => existingWords.has(w));
+    
+    // Calculate similarity percentage
+    const maxWords = Math.max(titleWords.size, existingWords.size);
+    const similarity = maxWords > 0 ? commonWords.length / maxWords : 0;
+    
+    // If more than 70% words are the same, consider it a duplicate
+    if (similarity > 0.7) {
+      console.warn(`[Duplicate] ${Math.round(similarity * 100)}% similar: "${title}" vs "${existing}"`);
+      return true;
+    }
+  }
+  
+  return false;
 }
