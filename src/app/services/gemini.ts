@@ -72,7 +72,8 @@ export async function generateTitles(
   keywords: string,
   count: number,
   jenisKarya?: string,
-  tingkatPendidikan?: string
+  tingkatPendidikan?: string,
+  previousTitles?: string[]
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
@@ -86,7 +87,7 @@ export async function generateTitles(
   const maxRetries = 3;
 
   // First attempt
-  allTitles = await generateTitlesFromAI(field, topic, keywords, count, jenisKarya, tingkatPendidikan);
+  allTitles = await generateTitlesFromAI(field, topic, keywords, count, jenisKarya, tingkatPendidikan, previousTitles);
 
   // Validate relevance and filter out irrelevant titles
   const relevantTitles = allTitles.filter(title => 
@@ -110,7 +111,7 @@ export async function generateTitles(
     
     // Generate remaining titles with context of existing ones
     const additionalTitles = await generateAdditionalTitles(
-      field, topic, keywords, remaining, allTitles, jenisKarya, tingkatPendidikan
+      field, topic, keywords, remaining, allTitles, jenisKarya, tingkatPendidikan, previousTitles
     );
     
     // Validate relevance of new titles
@@ -153,13 +154,19 @@ async function generateTitlesFromAI(
   keywords: string,
   count: number,
   jenisKarya?: string,
-  tingkatPendidikan?: string
+  tingkatPendidikan?: string,
+  previousTitles?: string[]
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
-  const prompt = `Kamu adalah dosen pembimbing skripsi dan pakar penelitian.
+  // Format previous titles to avoid repetition
+  const previousTitlesSection = previousTitles && previousTitles.length > 0
+    ? `\n\nJudul yang SUDAH PERNAH DIBUAT SEBELUMNYA (JANGAN ULANGI ATAU MIRIP):\n${previousTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nBuat judul yang BENAR-BENAR BERBEDA dari daftar di atas.`
+    : '';
 
-Tugasmu adalah membuat rekomendasi judul penelitian.
+  const prompt = `Kamu adalah dosen pembimbing skripsi senior dan reviewer jurnal ilmiah.
+
+Tugasmu adalah membuat rekomendasi judul penelitian yang KREATIF, UNIK, SPESIFIK, dan BERKUALITAS TINGGI.${previousTitlesSection}
 
 WAJIB mengikuti seluruh parameter berikut.
 
@@ -219,7 +226,7 @@ Format output: daftar bernomor saja (1. judul, 2. judul, dst.) dari nomor 1 samp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.85, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.95, maxOutputTokens: 2048 }, // Higher temp for creativity
         }),
       }
     );
@@ -243,18 +250,20 @@ async function generateAdditionalTitles(
   remaining: number,
   existingTitles: string[],
   jenisKarya?: string,
-  tingkatPendidikan?: string
+  tingkatPendidikan?: string,
+  previousTitles?: string[]
 ): Promise<string[]> {
   const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY as string | undefined;
 
-  // Format existing titles for context
-  const existingList = existingTitles
+  // Combine existing and previous titles to avoid repetition
+  const allExistingTitles = [...existingTitles, ...(previousTitles || [])];
+  const existingList = allExistingTitles
     .map((t, i) => `${i + 1}. ${t}`)
     .join("\n");
 
-  const prompt = `Kamu adalah dosen pembimbing skripsi dan pakar penelitian.
+  const prompt = `Kamu adalah dosen pembimbing skripsi senior dan reviewer jurnal ilmiah.
 
-Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang BERBEDA SAMA SEKALI dari judul yang sudah ada.
+Tugas: Buat TEPAT ${remaining} judul penelitian tambahan yang KREATIF, UNIK, dan BERBEDA SAMA SEKALI dari judul yang sudah ada.
 
 WAJIB mengikuti seluruh parameter berikut.
 

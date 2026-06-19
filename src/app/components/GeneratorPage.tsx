@@ -25,6 +25,7 @@ export function GeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [previousTitles, setPreviousTitles] = useState<string[]>([]);
 
   const currentItem = historyId ? history.find(h => h.id === historyId) : null;
   const results = currentItem?.results ?? [];
@@ -48,7 +49,10 @@ export function GeneratorPage() {
     setLoading(true);
     try {
       const requestedCount = parseInt(count);
-      const titles = await generateTitles(field, topic, keywords, requestedCount, jenisKarya, tingkatPendidikan);
+      const titles = await generateTitles(field, topic, keywords, requestedCount, jenisKarya, tingkatPendidikan, previousTitles);
+      
+      // Track these titles to avoid repetition in future generations
+      setPreviousTitles(prev => [...prev, ...titles]);
       
       // Validate the number of titles generated
       if (titles.length < requestedCount) {
